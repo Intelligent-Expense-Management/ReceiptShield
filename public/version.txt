@@ -1,0 +1,3 @@
+BUILD_SHA
+BUILD_TIME
+NOTE=If you can fetch this file at /version.txt from your domain, Firebase Hosting is serving your site.

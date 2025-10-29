@@ -111,8 +111,13 @@ jobs:
         echo "✅ firebase.json found. Configuration looks good."
         
         # Deploy to Firebase
-        echo "🚀 Deploying to Firebase Hosting..."
-        firebase deploy --only hosting --token ${{ secrets.FIREBASE_TOKEN }} --debug
+        echo "🚀 Deploying to Firebase Hosting (project: ${{ secrets.FIREBASE_PROJECT_ID }})..."
+        if [ -z "${{ secrets.FIREBASE_PROJECT_ID }}" ]; then
+          echo "⚠️ FIREBASE_PROJECT_ID not set. Falling back to default project in firebase.json or CLI config.";
+          firebase deploy --only hosting --token ${{ secrets.FIREBASE_TOKEN }} --debug
+        else
+          firebase --project ${{ secrets.FIREBASE_PROJECT_ID }} deploy --only hosting --token ${{ secrets.FIREBASE_TOKEN }} --debug
+        fi
         
         if [ $? -eq 0 ]; then
           echo "✅ Firebase deployment completed successfully!"
