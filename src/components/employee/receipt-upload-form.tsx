@@ -15,6 +15,12 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Upload, FileImage, CheckCircle, AlertCircle, Loader2, X } from 'lucide-react';
 import type { ProcessedReceipt, ReceiptDataItem } from '@/types';
 
+// Debug build tag to verify deployment contents in Chrome DevTools
+const RECEIPT_UPLOAD_FORM_BUILD_TAG = 'RUF-DEBUG-2025-10-29T00:00Z';
+if (typeof window !== 'undefined') {
+  console.info(`[ReceiptUploadForm] Loaded build tag: ${RECEIPT_UPLOAD_FORM_BUILD_TAG}`);
+}
+
 interface UploadStep {
   id: string;
   label: string;
