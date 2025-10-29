@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
 import { uploadReceiptImage, fileToDataUri, testStorageConnectivity } from '@/lib/firebase-storage';
@@ -33,6 +33,10 @@ export default function ReceiptUploadForm() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   
+  useEffect(() => {
+    console.info('[ReceiptUploadForm] Rendered with build tag:', RECEIPT_UPLOAD_FORM_BUILD_TAG);
+  }, []);
+
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
