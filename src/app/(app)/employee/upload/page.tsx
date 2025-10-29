@@ -18,6 +18,9 @@ export default function UploadReceiptPage() {
             Back to Dashboard
         </Button>
       </div>
+      <div className="bg-red-500 text-white p-4 mb-4 rounded">
+        🚨 TEST: This page was updated at {new Date().toISOString()} - If you see this, deployment is working!
+      </div>
       <ReceiptUploadForm />
     </div>
   );
