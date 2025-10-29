@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [ main, master ]
 
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
@@ -13,6 +17,13 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Ensure clean workspace
+      run: |
+        git reset --hard HEAD
+        git clean -xfd
       
     - name: Setup Node.js
       uses: actions/setup-node@v4
@@ -23,6 +34,11 @@ jobs:
     - name: Install dependencies
       run: npm ci
       
+    - name: Set build metadata env
+      run: |
+        echo "NEXT_PUBLIC_BUILD_SHA=${GITHUB_SHA}" >> $GITHUB_ENV
+        echo "NEXT_PUBLIC_BUILD_TIME=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_ENV
+
     - name: Run type check
       run: npm run typecheck
       
@@ -43,6 +59,8 @@ jobs:
         NEXT_PUBLIC_EMAIL_FROM_NAME: ${{ secrets.NEXT_PUBLIC_EMAIL_FROM_NAME }}
         NEXT_PUBLIC_APP_URL: ${{ secrets.NEXT_PUBLIC_APP_URL }}
         NODE_ENV: production
+        NEXT_PUBLIC_BUILD_SHA: ${{ env.NEXT_PUBLIC_BUILD_SHA }}
+        NEXT_PUBLIC_BUILD_TIME: ${{ env.NEXT_PUBLIC_BUILD_TIME }}
         
     - name: Deploy to Firebase Hosting
       if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
