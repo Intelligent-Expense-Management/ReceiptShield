@@ -27,6 +27,41 @@ if [ ! -f ".env.production" ]; then
     exit 1
 fi
 
+# Pull latest code from repository (if in a git repo)
+if [ -d ".git" ]; then
+    echo "🔄 Pulling latest code from repository..."
+    CURRENT_BRANCH=$(git branch --show-current)
+    echo "📍 Current branch: $CURRENT_BRANCH"
+    
+    # Check if there are uncommitted changes
+    if ! git diff-index --quiet HEAD --; then
+        echo "⚠️  Warning: You have uncommitted changes in your working directory."
+        echo "   The deployment will use your local code, which may include uncommitted changes."
+        echo "   Consider committing or stashing changes before deploying."
+    fi
+    
+    # Always pull latest to ensure we're deploying the latest code
+    if [ -z "$CI" ]; then
+        # Pull latest changes (skip in CI where code is already fresh)
+        git fetch origin
+        LOCAL=$(git rev-parse @)
+        REMOTE=$(git rev-parse @{u} 2>/dev/null || echo "$LOCAL")
+        
+        if [ "$LOCAL" != "$REMOTE" ] && [ -n "$REMOTE" ]; then
+            echo "🔄 Pulling latest changes from origin/$CURRENT_BRANCH..."
+            git pull origin "$CURRENT_BRANCH" || {
+                echo "⚠️  Failed to pull. Continuing with local code..."
+            }
+        else
+            echo "✅ Local branch is up to date with remote."
+        fi
+    else
+        echo "ℹ️  Running in CI environment. Using checked out code."
+    fi
+else
+    echo "ℹ️  Not in a git repository. Building from current directory."
+fi
+
 # Build the application
 echo "📦 Building application..."
 npm run build
