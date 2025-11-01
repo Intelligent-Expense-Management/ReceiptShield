@@ -24,6 +24,31 @@ jobs:
       run: |
         git reset --hard HEAD
         git clean -xfd
+    
+    - name: Print Receipt Form Status (Start)
+      run: |
+        echo ""
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "📋 RECEIPT UPLOAD FORM STATUS - START (After checkout)"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        FORM_PATH="src/components/employee/receipt-upload-form.tsx"
+        if [ -f "$FORM_PATH" ]; then
+          echo "✅ File exists: $FORM_PATH"
+          echo "📏 File size: $(wc -c < "$FORM_PATH") bytes"
+          echo "🔐 File hash: $(md5sum "$FORM_PATH" | cut -d' ' -f1 || shasum -a 256 "$FORM_PATH" | cut -d' ' -f1)"
+          if grep -q "RECEIPT_UPLOAD_FORM_BUILD_TAG" "$FORM_PATH"; then
+            echo "🏷️  Build tag: $(grep "RECEIPT_UPLOAD_FORM_BUILD_TAG" "$FORM_PATH" | head -1 | sed -n "s/.*= '\([^']*\)'.*/\1/p")"
+          fi
+          echo ""
+          echo "📄 First 10 lines:"
+          echo "─────────────────────────────────────────────────"
+          head -n 10 "$FORM_PATH" | sed 's/^/   /'
+          echo "─────────────────────────────────────────────────"
+        else
+          echo "❌ FILE NOT FOUND: $FORM_PATH"
+        fi
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo ""
       
     - name: Setup Node.js
       uses: actions/setup-node@v4
@@ -45,6 +70,26 @@ jobs:
     - name: Run linting
       run: npm run lint
       
+    - name: Print Receipt Form Status (Before Build)
+      run: |
+        echo ""
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "📋 RECEIPT UPLOAD FORM STATUS - BEFORE BUILD"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        FORM_PATH="src/components/employee/receipt-upload-form.tsx"
+        if [ -f "$FORM_PATH" ]; then
+          echo "✅ File exists: $FORM_PATH"
+          echo "📏 File size: $(wc -c < "$FORM_PATH") bytes"
+          echo "🔐 File hash: $(md5sum "$FORM_PATH" | cut -d' ' -f1 || shasum -a 256 "$FORM_PATH" | cut -d' ' -f1)"
+          if grep -q "RECEIPT_UPLOAD_FORM_BUILD_TAG" "$FORM_PATH"; then
+            echo "🏷️  Build tag: $(grep "RECEIPT_UPLOAD_FORM_BUILD_TAG" "$FORM_PATH" | head -1 | sed -n "s/.*= '\([^']*\)'.*/\1/p")"
+          fi
+        else
+          echo "❌ FILE NOT FOUND: $FORM_PATH"
+        fi
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo ""
+
     - name: Build application
       run: npm run build
       env:
@@ -62,6 +107,31 @@ jobs:
         NEXT_PUBLIC_BUILD_SHA: ${{ env.NEXT_PUBLIC_BUILD_SHA }}
         NEXT_PUBLIC_BUILD_TIME: ${{ env.NEXT_PUBLIC_BUILD_TIME }}
         
+    - name: Print Receipt Form Status (After Build)
+      run: |
+        echo ""
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "📋 RECEIPT UPLOAD FORM STATUS - AFTER BUILD"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        FORM_PATH="src/components/employee/receipt-upload-form.tsx"
+        if [ -f "$FORM_PATH" ]; then
+          echo "✅ File exists: $FORM_PATH"
+          echo "📏 File size: $(wc -c < "$FORM_PATH") bytes"
+          echo "🔐 File hash: $(md5sum "$FORM_PATH" | cut -d' ' -f1 || shasum -a 256 "$FORM_PATH" | cut -d' ' -f1)"
+          if grep -q "RECEIPT_UPLOAD_FORM_BUILD_TAG" "$FORM_PATH"; then
+            echo "🏷️  Build tag: $(grep "RECEIPT_UPLOAD_FORM_BUILD_TAG" "$FORM_PATH" | head -1 | sed -n "s/.*= '\([^']*\)'.*/\1/p")"
+          fi
+          echo ""
+          echo "📄 Last 5 lines:"
+          echo "─────────────────────────────────────────────────"
+          tail -n 5 "$FORM_PATH" | sed 's/^/   /'
+          echo "─────────────────────────────────────────────────"
+        else
+          echo "❌ FILE NOT FOUND: $FORM_PATH"
+        fi
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo ""
+
     - name: Install Firebase CLI
       run: npm install -g firebase-tools@13.0.0
 
@@ -79,6 +149,25 @@ jobs:
         echo "🚀 Deploying to Firebase App Hosting (project: ${FIREBASE_PROJECT_ID})..."
         firebase --project ${FIREBASE_PROJECT_ID} deploy --only apphosting --token ${FIREBASE_TOKEN} --debug
         echo "✅ App Hosting deployment completed"
+        
+        # Print form status after deployment
+        echo ""
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "📋 RECEIPT UPLOAD FORM STATUS - END (After deployment)"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        FORM_PATH="src/components/employee/receipt-upload-form.tsx"
+        if [ -f "$FORM_PATH" ]; then
+          echo "✅ File exists: $FORM_PATH"
+          echo "📏 File size: $(wc -c < "$FORM_PATH") bytes"
+          echo "🔐 File hash: $(md5sum "$FORM_PATH" | cut -d' ' -f1 || shasum -a 256 "$FORM_PATH" | cut -d' ' -f1)"
+          if grep -q "RECEIPT_UPLOAD_FORM_BUILD_TAG" "$FORM_PATH"; then
+            echo "🏷️  Build tag: $(grep "RECEIPT_UPLOAD_FORM_BUILD_TAG" "$FORM_PATH" | head -1 | sed -n "s/.*= '\([^']*\)'.*/\1/p")"
+          fi
+        else
+          echo "❌ FILE NOT FOUND: $FORM_PATH"
+        fi
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo ""
 
     - name: Deploy to Firebase Hosting
       if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'

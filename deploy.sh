@@ -5,7 +5,60 @@
 
 set -e  # Exit on any error
 
+# Function to print receipt upload form status for debugging
+print_receipt_form_status() {
+    local stage=$1
+    local form_path="src/components/employee/receipt-upload-form.tsx"
+    
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "📋 RECEIPT UPLOAD FORM STATUS - $stage"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    
+    if [ -f "$form_path" ]; then
+        echo "✅ File exists: $form_path"
+        
+        # Get file size and checksum
+        local file_size=$(wc -c < "$form_path" 2>/dev/null || echo "0")
+        local file_hash=$(md5sum "$form_path" 2>/dev/null | cut -d' ' -f1 || shasum -a 256 "$form_path" 2>/dev/null | cut -d' ' -f1 || echo "unknown")
+        
+        echo "📏 File size: $file_size bytes"
+        echo "🔐 File hash: $file_hash"
+        
+        # Extract build tag if present
+        if grep -q "RECEIPT_UPLOAD_FORM_BUILD_TAG" "$form_path" 2>/dev/null; then
+            local build_tag=$(grep "RECEIPT_UPLOAD_FORM_BUILD_TAG" "$form_path" | head -1 | sed -n "s/.*= '\([^']*\)'.*/\1/p" || echo "not found")
+            echo "🏷️  Build tag: $build_tag"
+        else
+            echo "⚠️  Build tag not found in file"
+        fi
+        
+        # Show first 10 lines
+        echo ""
+        echo "📄 First 10 lines:"
+        echo "─────────────────────────────────────────────────"
+        head -n 10 "$form_path" | sed 's/^/   /'
+        echo "─────────────────────────────────────────────────"
+        
+        # Show last 5 lines
+        echo ""
+        echo "📄 Last 5 lines:"
+        echo "─────────────────────────────────────────────────"
+        tail -n 5 "$form_path" | sed 's/^/   /'
+        echo "─────────────────────────────────────────────────"
+        
+    else
+        echo "❌ FILE NOT FOUND: $form_path"
+        echo "⚠️  WARNING: Receipt upload form is missing!"
+    fi
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+}
+
 echo "🚀 Starting ReceiptShield Production Deployment..."
+
+# Print form status at the very beginning
+print_receipt_form_status "START (Before any operations)"
 
 # Check if Firebase CLI is installed
 if ! command -v firebase &> /dev/null; then
@@ -62,6 +115,9 @@ else
     echo "ℹ️  Not in a git repository. Building from current directory."
 fi
 
+# Print form status after git operations
+print_receipt_form_status "AFTER GIT PULL (Before build)"
+
 # Build the application
 echo "📦 Building application..."
 npm run build
@@ -73,12 +129,19 @@ fi
 
 echo "✅ Build completed successfully!"
 
+# Print form status after build
+print_receipt_form_status "AFTER BUILD (Before deployment)"
+
 # Deploy to Firebase App Hosting
 echo "🚀 Deploying to Firebase App Hosting..."
 firebase deploy --only apphosting
 
 if [ $? -eq 0 ]; then
     echo "🎉 Deployment completed successfully!"
+    
+    # Print form status after deployment
+    print_receipt_form_status "END (After deployment)"
+    
     echo "Your app should be available at the Firebase App Hosting URL."
     echo "Next steps:"
     echo "1. Configure your custom domain in Firebase Console"
@@ -86,5 +149,9 @@ if [ $? -eq 0 ]; then
     echo "3. Test all functionality in production"
 else
     echo "❌ Deployment failed. Please check the errors above."
+    
+    # Print form status even on failure
+    print_receipt_form_status "END (After failed deployment)"
+    
     exit 1
 fi
