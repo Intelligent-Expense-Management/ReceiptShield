@@ -28,7 +28,8 @@ import {
   Sun,
   Moon,
   Monitor,
-  Activity
+  Activity,
+  CreditCard
 } from "lucide-react";
 
 interface ModernSidebarProps {
@@ -193,6 +194,7 @@ export function ModernSidebar({
 
   const navigationItems = getNavigationItems();
 
+  // Build utility items with conditional subscription link
   const utilityItems = [
     {
       href: "/profile",
@@ -206,6 +208,13 @@ export function ModernSidebar({
       icon: Bell,
       badge: 5
     },
+    // Show subscription link for company owners or users with subscription management permission
+    ...(user && (user.isCompanyOwner || user.canManageSubscription) ? [{
+      href: "/settings/subscription",
+      label: "Subscription",
+      icon: CreditCard,
+      badge: null
+    }] : []),
     {
       href: "/help",
       label: "Help",

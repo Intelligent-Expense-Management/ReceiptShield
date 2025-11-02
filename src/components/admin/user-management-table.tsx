@@ -57,9 +57,19 @@ export function UserManagementTable() {
             console.log('🔄 Loading users from Firestore...');
             const allUsers = await getUsers();
             const allManagers = await getManagers();
-            console.log('📊 Users loaded:', allUsers.length, 'users,', allManagers.length, 'managers');
-            setUsers(allUsers);
-            setManagers(allManagers);
+            
+            // Filter users by company if user is not a platform admin
+            let filteredUsers = allUsers;
+            let filteredManagers = allManagers;
+            
+            if (currentUser && !currentUser.isPlatformAdmin && currentUser.companyId) {
+                filteredUsers = allUsers.filter(user => user.companyId === currentUser.companyId);
+                filteredManagers = allManagers.filter(user => user.companyId === currentUser.companyId);
+            }
+            
+            console.log('📊 Users loaded:', filteredUsers.length, 'users,', filteredManagers.length, 'managers');
+            setUsers(filteredUsers);
+            setManagers(filteredManagers);
             setLoading(false);
         } catch (error) {
             console.error('❌ Error loading users:', error);
@@ -201,12 +211,24 @@ export function UserManagementTable() {
                             </div>
                         </TableCell>
                         <TableCell>
-                            <Badge 
-                                variant={user.role === 'admin' ? 'destructive' : user.role === 'manager' ? 'secondary' : 'default'}
-                                className="capitalize"
-                            >
-                                {user.role}
-                            </Badge>
+                            <div className="flex flex-col gap-1">
+                                <Badge 
+                                    variant={user.role === 'admin' ? 'destructive' : user.role === 'manager' ? 'secondary' : 'default'}
+                                    className="capitalize w-fit"
+                                >
+                                    {user.role}
+                                </Badge>
+                                {user.isCompanyOwner && (
+                                    <Badge variant="outline" className="w-fit text-xs bg-blue-50 text-blue-700 border-blue-200">
+                                        Company Owner
+                                    </Badge>
+                                )}
+                                {user.canManageSubscription && (
+                                    <Badge variant="outline" className="w-fit text-xs bg-green-50 text-green-700 border-green-200">
+                                        Can Manage Subscription
+                                    </Badge>
+                                )}
+                            </div>
                         </TableCell>
                         <TableCell className="hidden md:table-cell">
                             {getSupervisorName(user.supervisorId)}

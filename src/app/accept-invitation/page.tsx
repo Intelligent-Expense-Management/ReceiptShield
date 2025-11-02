@@ -140,6 +140,21 @@ function AcceptInvitationContent() {
         uid: userCredential.user.uid,
       });
 
+      // Record user addition for subscription usage tracking
+      // Get companyId from the invitation's invitedBy user's companyId
+      // Note: This assumes invitations store companyId - if not, we'll need to fetch it from the inviting user
+      const { getUserById } = await import('@/lib/firebase-user-store');
+      const { recordUserAddition } = await import('@/lib/subscription-middleware');
+      try {
+        const invitingUser = await getUserById(invitation.invitedBy);
+        if (invitingUser?.companyId) {
+          await recordUserAddition(invitingUser.companyId);
+        }
+      } catch (error) {
+        console.error('Error recording user addition:', error);
+        // Don't block invitation acceptance if this fails
+      }
+
       // Update invitation status
       await updateInvitationStatus(invitation.id, 'accepted', userId);
 
