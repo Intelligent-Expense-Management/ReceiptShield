@@ -29,7 +29,9 @@ import {
   Moon,
   Monitor,
   Activity,
-  CreditCard
+  CreditCard,
+  Building2,
+  Globe
 } from "lucide-react";
 
 interface ModernSidebarProps {
@@ -155,6 +157,13 @@ export function ModernSidebar({
       
       case "admin": {
         const adminItems = [
+          // Platform Dashboard for platform admins
+          ...(user?.isPlatformAdmin ? [{
+            href: "/platform/dashboard",
+            label: "Platform Dashboard",
+            icon: Globe,
+            badge: null
+          }] : []),
           {
             href: `${basePath}/dashboard`,
             label: "Overview",
