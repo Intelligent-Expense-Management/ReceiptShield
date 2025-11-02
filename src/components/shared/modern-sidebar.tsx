@@ -28,7 +28,8 @@ import {
   Sun,
   Moon,
   Monitor,
-  Activity
+  Activity,
+  CreditCard
 } from "lucide-react";
 
 interface ModernSidebarProps {
@@ -152,8 +153,8 @@ export function ModernSidebar({
           }
         ];
       
-      case "admin":
-        return [
+      case "admin": {
+        const adminItems = [
           {
             href: `${basePath}/dashboard`,
             label: "Overview",
@@ -172,12 +173,13 @@ export function ModernSidebar({
             icon: BarChart3,
             badge: null
           },
-          {
+          // Only show System Monitoring for platform admins
+          ...(user?.isPlatformAdmin ? [{
             href: `${basePath}/monitoring`,
             label: "System Monitoring",
             icon: Activity,
             badge: null
-          },
+          }] : []),
           {
             href: `${basePath}/fraud-alerts`,
             label: "Fraud Detection",
@@ -185,6 +187,8 @@ export function ModernSidebar({
             badge: 5
           }
         ];
+        return adminItems;
+      }
       
       default:
         return [];
@@ -193,6 +197,7 @@ export function ModernSidebar({
 
   const navigationItems = getNavigationItems();
 
+  // Build utility items with conditional subscription link
   const utilityItems = [
     {
       href: "/profile",
@@ -206,6 +211,13 @@ export function ModernSidebar({
       icon: Bell,
       badge: 5
     },
+    // Show subscription link for company owners or users with subscription management permission
+    ...(user && (user.isCompanyOwner || user.canManageSubscription) ? [{
+      href: "/settings/subscription",
+      label: "Subscription",
+      icon: CreditCard,
+      badge: null
+    }] : []),
     {
       href: "/help",
       label: "Help",

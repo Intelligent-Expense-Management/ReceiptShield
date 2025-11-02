@@ -285,10 +285,20 @@ export function LoginForm() {
           </Button>
         </form>
       </CardContent>
-      <CardFooter className="flex justify-center">
-        <Button variant="link" onClick={toggleMode} className="text-sm">
-          {isCreateAccountMode ? 'Already have an account? Sign In' : "Don't have an account? Create one"}
-        </Button>
+      <CardFooter className="flex flex-col space-y-4">
+        <div className="text-center text-sm text-gray-600">
+          Don't have an account?{' '}
+          <Link href="/signup" className="text-primary hover:underline">
+            Create one
+          </Link>
+        </div>
+        {isCreateAccountMode && (
+          <div className="text-center">
+            <Button variant="link" onClick={toggleMode} className="text-sm">
+              Already have an account? Sign In
+            </Button>
+          </div>
+        )}
       </CardFooter>
     </Card>
   );

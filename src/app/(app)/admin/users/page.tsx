@@ -1,15 +1,21 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Users, UserPlus, Mail, Phone, Shield, CheckCircle, Clock, AlertTriangle, Loader2 } from "lucide-react";
-import { getAllUsers } from "@/lib/firebase-auth";
+import { getUsers } from "@/lib/firebase-user-store";
 import { getAllReceipts } from "@/lib/receipt-store";
+import { useAuth } from "@/contexts/auth-context";
+import { InviteUserDialog } from "@/components/admin/invite-user-dialog";
+import { ManagePermissionsDialog } from "@/components/admin/manage-permissions-dialog";
+import { BulkActionsDialog } from "@/components/admin/bulk-actions-dialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
 import type { User } from "@/types";
-import type { ProcessedReceipt } from "@/types";
 
 // Interface for user with spending data
 interface UserWithSpending extends User {
@@ -21,8 +27,15 @@ interface UserWithSpending extends User {
 }
 
 export default function AdminUsersPage() {
+  const { user: currentUser } = useAuth();
+  const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
   const [users, setUsers] = useState<UserWithSpending[]>([]);
+  const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
+  const [isManagePermissionsDialogOpen, setIsManagePermissionsDialogOpen] = useState(false);
+  const [isBulkActionsDialogOpen, setIsBulkActionsDialogOpen] = useState(false);
+  const [selectedUserForPermissions, setSelectedUserForPermissions] = useState<User | null>(null);
+  const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
   const [userStats, setUserStats] = useState({
     totalUsers: 0,
     activeUsers: 0,
@@ -72,18 +85,18 @@ export default function AdminUsersPage() {
   };
 
   // Real-time data fetching functions
-  const fetchRealUsersData = async () => {
+  const fetchRealUsersData = useCallback(async () => {
     try {
       setIsLoading(true);
-      console.log('Fetching real users data...');
 
-      // Fetch all users and receipts
+      // Filter by companyId unless user is platform admin
+      const companyId = currentUser?.isPlatformAdmin ? undefined : currentUser?.companyId;
+      
+      // Fetch all users and receipts filtered by company
       const [allUsers, allReceipts] = await Promise.all([
-        getAllUsers(),
-        getAllReceipts()
+        getUsers(companyId),
+        getAllReceipts(undefined, companyId)
       ]);
-
-      console.log('Fetched data:', { users: allUsers.length, receipts: allReceipts.length });
 
       // Calculate spending per user
       const userSpendingMap = new Map<string, { totalSpending: number; receipts: number }>();
@@ -156,25 +169,92 @@ export default function AdminUsersPage() {
         pendingInvitations: 0 // TODO: Get from invitations table
       });
 
-      console.log('Users data updated:', {
-        totalUsers,
-        activeUsers,
-        inactiveUsers,
-        totalSpending,
-        averagePerUser
-      });
-
     } catch (error) {
       console.error('Error fetching users data:', error);
     } finally {
       setIsLoading(false);
     }
+  }, [currentUser?.companyId, currentUser?.isPlatformAdmin]);
+
+  // Load data on component mount and when user/companyId changes
+  useEffect(() => {
+    if (currentUser) {
+      fetchRealUsersData();
+    }
+  }, [currentUser, fetchRealUsersData]);
+
+  const handleInvitationSent = () => {
+    // Refresh user data after invitation is sent
+    fetchRealUsersData();
+    window.dispatchEvent(new Event('invitation-sent'));
   };
 
-  // Load data on component mount
-  useEffect(() => {
+  const handleInviteUsers = () => {
+    setIsInviteDialogOpen(true);
+  };
+
+  const handleManagePermissions = () => {
+    // Open a dialog to select a user first, or show all users
+    // For now, we'll show a message to select from the table
+    toast({
+      title: "Select a User",
+      description: "Please select a user from the table above and use the actions menu to manage their permissions.",
+    });
+  };
+
+  const handleOpenManagePermissions = (user?: User) => {
+    if (user) {
+      setSelectedUserForPermissions(user);
+      setIsManagePermissionsDialogOpen(true);
+    } else {
+      handleManagePermissions();
+    }
+  };
+
+  const handlePermissionsUpdated = () => {
     fetchRealUsersData();
-  }, []);
+  };
+
+  const handleBulkActions = () => {
+    if (selectedUserIds.size === 0) {
+      toast({
+        title: "No Users Selected",
+        description: "Please select one or more users from the list above to perform bulk actions.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setIsBulkActionsDialogOpen(true);
+  };
+
+  const handleToggleUserSelection = (userId: string) => {
+    setSelectedUserIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(userId)) {
+        newSet.delete(userId);
+      } else {
+        newSet.add(userId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleSelectAll = () => {
+    if (selectedUserIds.size === users.length) {
+      setSelectedUserIds(new Set());
+    } else {
+      setSelectedUserIds(new Set(users.map(u => u.id)));
+    }
+  };
+
+  const getSelectedUsers = (): User[] => {
+    return users.filter(u => selectedUserIds.has(u.id));
+  };
+
+  const handleBulkActionComplete = () => {
+    setSelectedUserIds(new Set());
+    fetchRealUsersData();
+  };
 
   // Show loading state
   if (isLoading) {
@@ -210,7 +290,10 @@ export default function AdminUsersPage() {
               'Refresh Data'
             )}
           </Button>
-          <Button className="bg-primary hover:bg-primary/90">
+          <Button 
+            className="bg-primary hover:bg-primary/90"
+            onClick={handleInviteUsers}
+          >
             <UserPlus className="h-4 w-4 mr-2" />
             Invite User
           </Button>
@@ -267,8 +350,26 @@ export default function AdminUsersPage() {
       {/* Users List */}
       <Card>
         <CardHeader>
-          <CardTitle>All Users</CardTitle>
-          <CardDescription>Manage user accounts, roles, and permissions</CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>All Users</CardTitle>
+              <CardDescription>Manage user accounts, roles, and permissions</CardDescription>
+            </div>
+            {selectedUserIds.size > 0 && (
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary" className="text-sm">
+                  {selectedUserIds.size} selected
+                </Badge>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setSelectedUserIds(new Set())}
+                >
+                  Clear Selection
+                </Button>
+              </div>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           {users.length === 0 ? (
@@ -284,9 +385,31 @@ export default function AdminUsersPage() {
             </div>
           ) : (
             <div className="space-y-4">
+              {/* Select All Checkbox */}
+              <div className="flex items-center gap-3 pb-2 border-b">
+                <Checkbox
+                  checked={selectedUserIds.size === users.length && users.length > 0}
+                  onCheckedChange={handleSelectAll}
+                />
+                <Label className="text-sm font-medium cursor-pointer" onClick={handleSelectAll}>
+                  Select All ({users.length} users)
+                </Label>
+              </div>
+              
               {users.map((user) => (
-              <div key={user.id} className="flex items-center justify-between p-4 border border-[var(--color-border)] rounded-lg hover:bg-[var(--color-bg-secondary)] transition-colors bg-[var(--color-card)]">
+              <div 
+                key={user.id} 
+                className={`flex items-center justify-between p-4 border rounded-lg transition-colors bg-[var(--color-card)] ${
+                  selectedUserIds.has(user.id) 
+                    ? 'border-primary bg-primary/5' 
+                    : 'border-[var(--color-border)] hover:bg-[var(--color-bg-secondary)]'
+                }`}
+              >
                 <div className="flex items-center space-x-4">
+                  <Checkbox
+                    checked={selectedUserIds.has(user.id)}
+                    onCheckedChange={() => handleToggleUserSelection(user.id)}
+                  />
                   <Avatar className="h-10 w-10">
                     <AvatarImage src={user.avatar || ''} alt={user.name} />
                     <AvatarFallback>
@@ -331,7 +454,11 @@ export default function AdminUsersPage() {
                       </Button>
                     </div>
                     <div className="flex space-x-2">
-                      <Button variant="outline" size="sm">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => handleOpenManagePermissions(user)}
+                      >
                         <Shield className="h-4 w-4 mr-1" />
                         Permissions
                       </Button>
@@ -360,23 +487,60 @@ export default function AdminUsersPage() {
               <UserPlus className="h-8 w-8 text-blue-600 mx-auto mb-2" />
               <h3 className="font-medium mb-1">Invite Users</h3>
               <p className="text-sm text-gray-600 mb-3">Send invitations to new users</p>
-              <Button variant="outline" size="sm">Send Invitations</Button>
+              <Button variant="outline" size="sm" onClick={handleInviteUsers}>Send Invitations</Button>
             </div>
             <div className="text-center p-4 border rounded-lg">
               <Shield className="h-8 w-8 text-green-600 mx-auto mb-2" />
               <h3 className="font-medium mb-1">Manage Permissions</h3>
               <p className="text-sm text-gray-600 mb-3">Update user roles and access</p>
-              <Button variant="outline" size="sm">Update Roles</Button>
+              <Button variant="outline" size="sm" onClick={() => handleManagePermissions()}>Select User First</Button>
+              <p className="text-xs text-gray-500 mt-2">Use user actions menu to manage permissions</p>
             </div>
             <div className="text-center p-4 border rounded-lg">
               <Users className="h-8 w-8 text-purple-600 mx-auto mb-2" />
               <h3 className="font-medium mb-1">Bulk Actions</h3>
               <p className="text-sm text-gray-600 mb-3">Perform actions on multiple users</p>
-              <Button variant="outline" size="sm">Bulk Actions</Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleBulkActions}
+                disabled={selectedUserIds.size === 0}
+              >
+                Bulk Actions ({selectedUserIds.size})
+              </Button>
+              {selectedUserIds.size === 0 && (
+                <p className="text-xs text-gray-500 mt-2">Select users above first</p>
+              )}
             </div>
           </div>
         </CardContent>
       </Card>
+
+      {/* Invite User Dialog */}
+      <InviteUserDialog
+        isOpen={isInviteDialogOpen}
+        onClose={() => setIsInviteDialogOpen(false)}
+        onInvitationSent={handleInvitationSent}
+      />
+
+      {/* Manage Permissions Dialog */}
+      <ManagePermissionsDialog
+        isOpen={isManagePermissionsDialogOpen}
+        onClose={() => {
+          setIsManagePermissionsDialogOpen(false);
+          setSelectedUserForPermissions(null);
+        }}
+        user={selectedUserForPermissions}
+        onPermissionsUpdated={handlePermissionsUpdated}
+      />
+
+      {/* Bulk Actions Dialog */}
+      <BulkActionsDialog
+        isOpen={isBulkActionsDialogOpen}
+        onClose={() => setIsBulkActionsDialogOpen(false)}
+        selectedUsers={getSelectedUsers()}
+        onActionComplete={handleBulkActionComplete}
+      />
     </div>
   );
 }

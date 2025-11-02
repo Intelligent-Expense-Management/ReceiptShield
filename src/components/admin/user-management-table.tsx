@@ -36,9 +36,11 @@ import {
 } from "@/components/ui/alert-dialog";
 import { ReassignSupervisorDialog } from './reassign-supervisor-dialog';
 import { EditUserDialog } from './edit-user-dialog';
+import { ManagePermissionsDialog } from './manage-permissions-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/auth-context';
 import { cn } from '@/lib/utils';
+import { Shield } from 'lucide-react';
 
 export function UserManagementTable() {
     const { user: currentUser } = useAuth();
@@ -47,6 +49,7 @@ export function UserManagementTable() {
     const [selectedUser, setSelectedUser] = useState<User | null>(null);
     const [isReassignDialogOpen, setIsReassignDialogOpen] = useState(false);
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+    const [isManagePermissionsDialogOpen, setIsManagePermissionsDialogOpen] = useState(false);
     const [isDeactivateConfirmOpen, setIsDeactivateConfirmOpen] = useState(false);
     const [loading, setLoading] = useState(true);
     const { toast } = useToast();
@@ -55,9 +58,13 @@ export function UserManagementTable() {
         try {
             setLoading(true);
             console.log('🔄 Loading users from Firestore...');
-            const allUsers = await getUsers();
-            const allManagers = await getManagers();
-            console.log('📊 Users loaded:', allUsers.length, 'users,', allManagers.length, 'managers');
+            
+            // Filter by companyId unless user is platform admin
+            const companyId = currentUser?.isPlatformAdmin ? undefined : currentUser?.companyId;
+            const allUsers = await getUsers(companyId);
+            const allManagers = await getManagers(companyId); // Pass companyId to filter managers
+            
+            console.log('📊 Users loaded:', allUsers.length, 'users,', allManagers.length, 'managers', companyId ? `for company ${companyId}` : '(all companies)');
             setUsers(allUsers);
             setManagers(allManagers);
             setLoading(false);
@@ -94,7 +101,7 @@ export function UserManagementTable() {
             window.removeEventListener('storage', loadData);
             window.removeEventListener('focus', loadData);
         };
-    }, []);
+    }, [currentUser?.companyId, currentUser?.isPlatformAdmin]);
     
     const handleOpenReassignDialog = (user: User) => {
         if(user.role === 'employee') {
@@ -106,6 +113,11 @@ export function UserManagementTable() {
     const handleOpenEditDialog = (user: User) => {
         setSelectedUser(user);
         setIsEditDialogOpen(true);
+    };
+
+    const handleOpenManagePermissions = (user: User) => {
+        setSelectedUser(user);
+        setIsManagePermissionsDialogOpen(true);
     };
 
     const handleOpenDeactivateDialog = (user: User) => {
@@ -201,12 +213,24 @@ export function UserManagementTable() {
                             </div>
                         </TableCell>
                         <TableCell>
-                            <Badge 
-                                variant={user.role === 'admin' ? 'destructive' : user.role === 'manager' ? 'secondary' : 'default'}
-                                className="capitalize"
-                            >
-                                {user.role}
-                            </Badge>
+                            <div className="flex flex-col gap-1">
+                                <Badge 
+                                    variant={user.role === 'admin' ? 'destructive' : user.role === 'manager' ? 'secondary' : 'default'}
+                                    className="capitalize w-fit"
+                                >
+                                    {user.role}
+                                </Badge>
+                                {user.isCompanyOwner && (
+                                    <Badge variant="outline" className="w-fit text-xs bg-blue-50 text-blue-700 border-blue-200">
+                                        Company Owner
+                                    </Badge>
+                                )}
+                                {user.canManageSubscription && (
+                                    <Badge variant="outline" className="w-fit text-xs bg-green-50 text-green-700 border-green-200">
+                                        Can Manage Subscription
+                                    </Badge>
+                                )}
+                            </div>
                         </TableCell>
                         <TableCell className="hidden md:table-cell">
                             {getSupervisorName(user.supervisorId)}
@@ -229,6 +253,10 @@ export function UserManagementTable() {
                                     <DropdownMenuItem onClick={() => handleOpenEditDialog(user)} disabled={user.status === 'inactive'}>
                                         <Pencil className="mr-2 h-4 w-4" />
                                         Edit User
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleOpenManagePermissions(user)}>
+                                        <Shield className="mr-2 h-4 w-4" />
+                                        Manage Permissions
                                     </DropdownMenuItem>
                                     <DropdownMenuItem
                                         onClick={() => handleOpenReassignDialog(user)}
@@ -278,6 +306,17 @@ export function UserManagementTable() {
                 onClose={() => setIsEditDialogOpen(false)}
                 user={selectedUser}
                 onUserUpdated={handleUserUpdated}
+            />
+        )}
+        {selectedUser && (
+            <ManagePermissionsDialog
+                isOpen={isManagePermissionsDialogOpen}
+                onClose={() => {
+                    setIsManagePermissionsDialogOpen(false);
+                    setSelectedUser(null);
+                }}
+                user={selectedUser}
+                onPermissionsUpdated={handleUserUpdated}
             />
         )}
         <AlertDialog open={isDeactivateConfirmOpen} onOpenChange={setIsDeactivateConfirmOpen}>

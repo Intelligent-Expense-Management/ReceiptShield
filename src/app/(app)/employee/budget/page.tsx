@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Target, AlertTriangle, CheckCircle, DollarSign, TrendingUp } from "lucide-react";
+import { Target, AlertTriangle, CheckCircle, TrendingUp } from "lucide-react";
 
 export default function EmployeeBudgetPage() {
   const [budgets, setBudgets] = useState([
@@ -39,15 +39,13 @@ export default function EmployeeBudgetPage() {
     }
   ]);
 
-  const [isEditing, setIsEditing] = useState(false);
   const [editingBudget, setEditingBudget] = useState<{category: string, allocated: number} | null>(null);
 
   const handleEditBudget = (category: string, allocated: number) => {
     setEditingBudget({ category, allocated });
-    setIsEditing(true);
   };
 
-  const handleSaveBudget = (newAmount: number) => {
+  const _handleSaveBudget = (newAmount: number) => {
     if (editingBudget) {
       setBudgets(prev => prev.map(budget => 
         budget.category === editingBudget.category 
@@ -59,7 +57,6 @@ export default function EmployeeBudgetPage() {
             }
           : budget
       ));
-      setIsEditing(false);
       setEditingBudget(null);
       alert(`Budget updated for ${editingBudget.category}: $${newAmount}`);
     }

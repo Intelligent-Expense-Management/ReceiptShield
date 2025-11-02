@@ -1,5 +1,5 @@
 import { getCompany, incrementReceiptCount, incrementUserCount, decrementUserCount } from './firebase-company-store';
-import { canPerformAction } from './stripe-subscriptions';
+import { canPerformAction, getUsageLimits } from './stripe-subscriptions';
 import type { Company } from '@/types';
 
 export interface UsageCheckResult {
@@ -30,6 +30,7 @@ export async function canUploadReceipt(companyId: string): Promise<UsageCheckRes
     }
 
     const actionResult = canPerformAction(company, 'upload_receipt');
+    const limits = getUsageLimits(company.subscriptionTier);
     
     return {
       allowed: actionResult.allowed,
@@ -38,6 +39,10 @@ export async function canUploadReceipt(companyId: string): Promise<UsageCheckRes
       currentUsage: {
         receipts: company.receiptCount,
         users: company.userCount,
+      },
+      limits: {
+        maxReceipts: limits.maxReceipts,
+        maxUsers: limits.maxUsers,
       },
     };
   } catch (error) {
@@ -63,6 +68,7 @@ export async function canAddUser(companyId: string): Promise<UsageCheckResult> {
     }
 
     const actionResult = canPerformAction(company, 'add_user');
+    const limits = getUsageLimits(company.subscriptionTier);
     
     return {
       allowed: actionResult.allowed,
@@ -71,6 +77,10 @@ export async function canAddUser(companyId: string): Promise<UsageCheckResult> {
       currentUsage: {
         receipts: company.receiptCount,
         users: company.userCount,
+      },
+      limits: {
+        maxReceipts: limits.maxReceipts,
+        maxUsers: limits.maxUsers,
       },
     };
   } catch (error) {
@@ -183,69 +193,6 @@ export async function recordUserRemoval(companyId: string): Promise<void> {
   } catch (error) {
     console.error('Error recording user removal:', error);
     throw new Error('Failed to record user removal');
-  }
-}
-
-/**
- * Get usage limits for a subscription tier
- */
-export function getUsageLimits(tier: string) {
-  switch (tier) {
-    case 'trial':
-      return {
-        maxReceipts: 50,
-        maxUsers: 5,
-        features: {
-          advancedAnalytics: false,
-          apiAccess: false,
-          customIntegrations: false,
-          prioritySupport: false,
-        },
-      };
-    case 'basic':
-      return {
-        maxReceipts: 200,
-        maxUsers: 10,
-        features: {
-          advancedAnalytics: false,
-          apiAccess: false,
-          customIntegrations: false,
-          prioritySupport: false,
-        },
-      };
-    case 'professional':
-      return {
-        maxReceipts: 1000,
-        maxUsers: 50,
-        features: {
-          advancedAnalytics: true,
-          apiAccess: false,
-          customIntegrations: false,
-          prioritySupport: true,
-        },
-      };
-    case 'enterprise':
-      return {
-        maxReceipts: 5000,
-        maxUsers: -1, // Unlimited
-        features: {
-          advancedAnalytics: true,
-          apiAccess: true,
-          customIntegrations: true,
-          prioritySupport: true,
-        },
-      };
-    default:
-      return {
-        maxReceipts: 0,
-        maxUsers: 0,
-        features: {
-          advancedAnalytics: false,
-          apiAccess: false,
-          customIntegrations: false,
-          prioritySupport: false,
-        },
-      };
   }
 }
 

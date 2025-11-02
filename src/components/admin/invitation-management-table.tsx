@@ -33,9 +33,11 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/auth-context';
 import { cn } from '@/lib/utils';
 
 export function InvitationManagementTable() {
+  const { user: currentUser } = useAuth();
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [filteredInvitations, setFilteredInvitations] = useState<Invitation[]>([]);
   const [selectedInvitation, setSelectedInvitation] = useState<Invitation | null>(null);
@@ -48,13 +50,21 @@ export function InvitationManagementTable() {
   const loadInvitations = async () => {
     try {
       setIsLoading(true);
-      const invitationsData = await getInvitations();
+      const allInvitations = await getInvitations();
+      
+      // Filter by companyId unless user is platform admin
+      let invitationsData = allInvitations;
+      if (currentUser && !currentUser.isPlatformAdmin && currentUser.companyId) {
+        invitationsData = allInvitations.filter(inv => inv.companyId === currentUser.companyId);
+      }
+      
       setInvitations(invitationsData);
       applyFilter(invitationsData, statusFilter);
       console.log('📧 Loaded invitations:', {
         total: invitationsData.length,
         filter: statusFilter,
-        filtered: invitationsData.filter(inv => statusFilter === 'all' || inv.status === statusFilter).length
+        filtered: invitationsData.filter(inv => statusFilter === 'all' || inv.status === statusFilter).length,
+        companyId: currentUser?.companyId
       });
     } catch (error) {
       console.error('Error loading invitations:', error);
@@ -109,7 +119,7 @@ export function InvitationManagementTable() {
     return () => {
       window.removeEventListener('invitation-sent', handleInvitationSent);
     };
-  }, []);
+  }, [currentUser?.companyId, currentUser?.isPlatformAdmin]);
 
   const handleOpenCancelDialog = (invitation: Invitation) => {
     setSelectedInvitation(invitation);

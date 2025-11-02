@@ -6,9 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DollarSign, Files, ShieldAlert, Users } from 'lucide-react';
 import { getAllReceipts } from '@/lib/receipt-store';
 import { getUsers } from '@/lib/firebase-user-store';
+import { useAuth } from '@/contexts/auth-context';
 import type { ProcessedReceipt } from '@/types';
 
 export function GlobalAnalyticsCards() {
+    const { user } = useAuth();
     const [stats, setStats] = useState({
         totalExpenses: 0,
         totalReceipts: 0,
@@ -19,14 +21,29 @@ export function GlobalAnalyticsCards() {
 
     useEffect(() => {
         const loadStats = async () => {
+            if (!user?.companyId && !user?.isPlatformAdmin) {
+                // If user has no company and is not platform admin, show empty stats
+                setStats({
+                    totalExpenses: 0,
+                    totalReceipts: 0,
+                    totalFraudAlerts: 0,
+                    totalUsers: 0
+                });
+                setLoading(false);
+                return;
+            }
+
             try {
-                console.log('🔄 Loading analytics stats...');
-                const allReceipts = await getAllReceipts();
-                const allUsers = await getUsers();
+                console.log('🔄 Loading analytics stats for company:', user?.companyId);
+                // Filter by companyId unless user is platform admin
+                const companyId = user?.isPlatformAdmin ? undefined : user?.companyId;
+                const allReceipts = await getAllReceipts(undefined, companyId);
+                const allUsers = await getUsers(companyId);
                 
                 console.log('📊 Analytics data:', {
                     receipts: allReceipts.length,
-                    users: allUsers.length
+                    users: allUsers.length,
+                    companyId: companyId
                 });
 
                 const totalExpenses = allReceipts.reduce((acc, r) => {
@@ -61,7 +78,7 @@ export function GlobalAnalyticsCards() {
         };
 
         loadStats();
-    }, []);
+    }, [user?.companyId, user?.isPlatformAdmin]);
 
     if (loading) {
         return (

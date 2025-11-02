@@ -7,13 +7,15 @@ import { uploadReceiptImage, fileToDataUri, testStorageConnectivity } from '@/li
 import { addReceipt } from '@/lib/firebase-receipt-store';
 import { performEnhancedOCRAnalysis } from '@/lib/enhanced-ocr-service';
 import { extractTextWithTesseract } from '@/lib/tesseract-ocr-service';
+import { canUploadReceipt, recordReceiptUpload } from '@/lib/subscription-middleware';
 // import { performEnhancedFraudAnalysis } from '@/lib/enhanced-fraud-service'; // Temporarily disabled
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Upload, FileImage, CheckCircle, AlertCircle, Loader2, X } from 'lucide-react';
+import { Upload, FileImage, CheckCircle, AlertCircle, Loader2, X, ArrowUpCircle } from 'lucide-react';
 import type { ProcessedReceipt, ReceiptDataItem } from '@/types';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 // Debug build tag to verify deployment contents in Chrome DevTools
 const RECEIPT_UPLOAD_FORM_BUILD_TAG = 'RUF-DEBUG-2025-10-29T00:00Z';
@@ -45,6 +47,8 @@ export default function ReceiptUploadForm() {
   const [extractedItems, setExtractedItems] = useState<ReceiptDataItem[]>([]);
   const [isOcrProcessing, setIsOcrProcessing] = useState(false);
   const [ocrProgress, setOcrProgress] = useState(0);
+  const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
+  const [usageInfo, setUsageInfo] = useState<{ current: number; limit: number; reason?: string } | null>(null);
   const [uploadSteps, setUploadSteps] = useState<UploadStep[]>([
     { id: 'upload', label: 'Uploading image', status: 'pending', progress: 0 },
     { id: 'ocr', label: 'Extracting text', status: 'pending', progress: 0 },
@@ -151,6 +155,21 @@ export default function ReceiptUploadForm() {
 
   const processReceipt = async () => {
     if (!selectedFile || !user) return;
+
+    // Check subscription limits before proceeding
+    if (user.companyId) {
+      const usageCheck = await canUploadReceipt(user.companyId);
+      
+      if (!usageCheck.allowed) {
+        setUsageInfo({
+          current: usageCheck.currentUsage?.receipts || 0,
+          limit: usageCheck.limits?.maxReceipts || 0,
+          reason: usageCheck.reason,
+        });
+        setShowUpgradeDialog(true);
+        return;
+      }
+    }
 
     setIsUploading(true);
     setError(null);
@@ -303,6 +322,12 @@ export default function ReceiptUploadForm() {
       };
 
       const savedReceiptId = await addReceipt(receiptData);
+      
+      // Record receipt upload for subscription usage tracking
+      if (user.companyId) {
+        await recordReceiptUpload(user.companyId);
+      }
+      
       updateStep('save', 'completed', 100);
       setUploadProgress(100);
 
@@ -555,6 +580,56 @@ export default function ReceiptUploadForm() {
         onChange={handleFileInputChange}
         className="hidden"
       />
+
+      {/* Upgrade Dialog */}
+      <Dialog open={showUpgradeDialog} onOpenChange={setShowUpgradeDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-yellow-500" />
+              Receipt Upload Limit Reached
+            </DialogTitle>
+            <DialogDescription>
+              {usageInfo?.reason || 'You have reached your monthly receipt upload limit.'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="bg-muted p-4 rounded-lg">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-sm font-medium">Current Usage</span>
+                <span className="text-sm">
+                  {usageInfo?.current || 0} / {usageInfo?.limit || 0} receipts
+                </span>
+              </div>
+              <div className="w-full bg-background rounded-full h-2.5">
+                <div
+                  className="bg-primary h-2.5 rounded-full"
+                  style={{
+                    width: `${Math.min(100, ((usageInfo?.current || 0) / (usageInfo?.limit || 1)) * 100)}%`,
+                  }}
+                />
+              </div>
+            </div>
+            <Alert>
+              <AlertDescription>
+                To upload more receipts, please upgrade your subscription plan.
+              </AlertDescription>
+            </Alert>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowUpgradeDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={() => {
+              setShowUpgradeDialog(false);
+              router.push('/settings/subscription');
+            }}>
+              <ArrowUpCircle className="mr-2 h-4 w-4" />
+              Upgrade Plan
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

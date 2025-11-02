@@ -38,9 +38,11 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/auth-context';
 import { createInvitation, getInvitationByToken } from '@/lib/firebase-invitation-store';
 import { getUsers } from '@/lib/firebase-user-store';
+import { canAddUser } from '@/lib/subscription-middleware';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { User, UserRole, InvitationRequest } from '@/types';
+import { useRouter } from 'next/navigation';
 
 const inviteUserSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
@@ -73,10 +75,13 @@ export function InviteUserDialog({
 }: InviteUserDialogProps) {
   const { user: currentUser } = useAuth();
   const { toast } = useToast();
+  const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [managers, setManagers] = useState<User[]>([]);
   const [sentInvitation, setSentInvitation] = useState<null | { email: string; token: string; role: UserRole }>(null);
   const [copied, setCopied] = useState(false);
+  const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
+  const [usageInfo, setUsageInfo] = useState<{ current: number; limit: number; reason?: string } | null>(null);
   const [emailValidation, setEmailValidation] = useState<{
     isValidating: boolean;
     isExisting: boolean;
@@ -135,8 +140,17 @@ export function InviteUserDialog({
 
   const loadManagers = async () => {
     try {
+      if (!currentUser?.companyId) {
+        setManagers([]);
+        return;
+      }
       const allUsers = await getUsers();
-      const managerUsers = allUsers.filter(user => user.role === 'manager' && user.status === 'active');
+      // Filter by companyId and role to only show managers from the same company
+      const managerUsers = allUsers.filter(
+        user => user.role === 'manager' && 
+        user.status === 'active' && 
+        user.companyId === currentUser.companyId
+      );
       setManagers(managerUsers);
     } catch (error) {
       console.error('Error loading managers:', error);
@@ -212,16 +226,36 @@ export function InviteUserDialog({
   const onSubmit = async (data: InviteUserFormData) => {
     if (!currentUser || emailValidation.isExisting) return;
 
+    // Check subscription limits before proceeding
+    if (currentUser.companyId) {
+      const usageCheck = await canAddUser(currentUser.companyId);
+      
+      if (!usageCheck.allowed) {
+        setUsageInfo({
+          current: usageCheck.currentUsage?.users || 0,
+          limit: usageCheck.limits?.maxUsers || 0,
+          reason: usageCheck.reason,
+        });
+        setShowUpgradeDialog(true);
+        return;
+      }
+    }
+
     setIsLoading(true);
     setEmailStatus('sending');
     setEmailError(null);
 
     try {
+      if (!currentUser?.companyId) {
+        throw new Error('You must be associated with a company to send invitations');
+      }
+
       const invitationData: InvitationRequest = {
         email: data.email,
         role: data.role,
         supervisorId: data.supervisorId || undefined,
         message: data.message || undefined,
+        companyId: currentUser.companyId, // Include companyId so users are assigned to the correct company
       };
 
       // Send invitation
@@ -604,6 +638,58 @@ export function InviteUserDialog({
           </>
         )}
       </DialogContent>
+
+      {/* Upgrade Dialog */}
+      <Dialog open={showUpgradeDialog} onOpenChange={setShowUpgradeDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-yellow-500" />
+              User Limit Reached
+            </DialogTitle>
+            <DialogDescription>
+              {usageInfo?.reason || 'You have reached your monthly user limit.'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="bg-muted p-4 rounded-lg">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-sm font-medium">Current Usage</span>
+                <span className="text-sm">
+                  {usageInfo?.current || 0} / {usageInfo?.limit === -1 ? 'Unlimited' : usageInfo?.limit || 0} users
+                </span>
+              </div>
+              {usageInfo && usageInfo.limit !== -1 && (
+                <div className="w-full bg-background rounded-full h-2.5 mt-2">
+                  <div
+                    className="bg-primary h-2.5 rounded-full"
+                    style={{
+                      width: `${Math.min(100, ((usageInfo?.current || 0) / (usageInfo?.limit || 1)) * 100)}%`,
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+            <AlertCircle className="h-4 w-4 text-muted-foreground" />
+            <div className="text-sm text-muted-foreground">
+              To invite more users, please upgrade your subscription plan.
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowUpgradeDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={() => {
+              setShowUpgradeDialog(false);
+              onClose();
+              router.push('/settings/subscription');
+            }}>
+              <UserPlus className="mr-2 h-4 w-4" />
+              Upgrade Plan
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }

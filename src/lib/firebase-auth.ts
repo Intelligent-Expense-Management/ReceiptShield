@@ -68,7 +68,7 @@ async function ensureUserProfile(firebaseUser: FirebaseUser): Promise<User> {
 async function createUserProfile(userId: string, userData: Partial<User>): Promise<void> {
   try {
     const userRef = doc(db, 'users', userId);
-    await setDoc(userRef, {
+    const profileData: any = {
       uid: userId,
       name: userData.name,
       email: userData.email?.toLowerCase(),
@@ -77,8 +77,27 @@ async function createUserProfile(userId: string, userData: Partial<User>): Promi
       supervisorId: userData.supervisorId || null,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
+    };
+    
+    // Include company-related fields if provided
+    if (userData.companyId !== undefined) {
+      profileData.companyId = userData.companyId;
+    }
+    if (userData.isCompanyOwner !== undefined) {
+      profileData.isCompanyOwner = userData.isCompanyOwner;
+    }
+    if (userData.canManageSubscription !== undefined) {
+      profileData.canManageSubscription = userData.canManageSubscription;
+    }
+    if (userData.isPlatformAdmin !== undefined) {
+      profileData.isPlatformAdmin = userData.isPlatformAdmin;
+    }
+    
+    await setDoc(userRef, profileData);
+    console.log('User profile created in Firestore with company data:', {
+      companyId: userData.companyId,
+      isCompanyOwner: userData.isCompanyOwner
     });
-    console.log('User profile created in Firestore');
   } catch (error) {
     console.error('Error creating user profile:', error);
     throw error;
@@ -101,6 +120,10 @@ async function getUserData(userId: string): Promise<User | null> {
         role: data.role,
         status: data.status,
         supervisorId: data.supervisorId,
+        companyId: data.companyId,
+        isCompanyOwner: data.isCompanyOwner || false,
+        canManageSubscription: data.canManageSubscription || false,
+        isPlatformAdmin: data.isPlatformAdmin || false,
         createdAt: data.createdAt?.toDate(),
         updatedAt: data.updatedAt?.toDate(),
       };

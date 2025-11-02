@@ -207,7 +207,8 @@ export interface Invitation {
   email: string;
   role: UserRole;
   supervisorId?: string; // For employees, who their manager will be
-  invitedBy: string; // Email of the admin who sent the invitation
+  invitedBy: string; // User ID of the admin who sent the invitation
+  companyId: string; // Company the user will be assigned to
   status: 'pending' | 'accepted' | 'expired' | 'cancelled';
   token: string; // Unique token for invitation link
   expiresAt: Date;
@@ -222,4 +223,5 @@ export interface InvitationRequest {
   role: UserRole;
   supervisorId?: string;
   message?: string; // Optional custom message from admin
+  companyId: string; // Company the user will be assigned to
 }

@@ -57,7 +57,7 @@ export async function createCheckoutSession({
  * Create a Stripe customer portal session for subscription management
  */
 export async function createPortalSession({
-  companyId,
+  companyId: _companyId,
   customerId,
 }: CreatePortalSessionParams) {
   const session = await getStripe().billingPortal.sessions.create({
