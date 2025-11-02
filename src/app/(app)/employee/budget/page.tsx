@@ -57,7 +57,6 @@ export default function EmployeeBudgetPage() {
             }
           : budget
       ));
-      setIsEditing(false);
       setEditingBudget(null);
       alert(`Budget updated for ${editingBudget.category}: $${newAmount}`);
     }
