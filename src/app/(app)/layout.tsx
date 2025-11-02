@@ -73,8 +73,13 @@ export default function AppLayout({ children }: { children: ReactNode }) {
       return;
     }
 
-    const currentBaseRoute = pathname.split('/')[1]; // e.g., "employee", "manager", "admin", "profile"
+    const currentBaseRoute = pathname.split('/')[1]; // e.g., "employee", "manager", "admin", "profile", "platform"
     const userBaseRoute = user.role;
+
+    // Allow platform admins to access platform dashboard
+    if (currentBaseRoute === 'platform' && user.isPlatformAdmin) {
+      return;
+    }
 
     // Allow access to profile pages for any role
     if (currentBaseRoute === 'profile') {
