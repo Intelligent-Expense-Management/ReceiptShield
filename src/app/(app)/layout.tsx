@@ -30,10 +30,12 @@ export default function AppLayout({ children }: { children: ReactNode }) {
     const checkSubscription = async () => {
       try {
         // First check and update expired subscriptions
-        await checkAndUpdateExpiredSubscriptions(user.companyId);
-        // Then get current status
-        const status = await getSubscriptionStatus(user.companyId);
-        setSubscriptionStatus(status);
+        if (user.companyId) {
+          await checkAndUpdateExpiredSubscriptions(user.companyId);
+          // Then get current status
+          const status = await getSubscriptionStatus(user.companyId);
+          setSubscriptionStatus(status);
+        }
       } catch (error) {
         console.error('Error checking subscription status:', error);
       } finally {

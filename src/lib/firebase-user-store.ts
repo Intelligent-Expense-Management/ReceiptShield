@@ -138,6 +138,36 @@ export async function getUsers(companyId?: string): Promise<User[]> {
   }
 }
 
+export async function getUserById(userId: string): Promise<User | undefined> {
+  try {
+    const userDoc = await getDoc(doc(db, USERS_COLLECTION, userId));
+    
+    if (!userDoc.exists()) {
+      return undefined;
+    }
+
+    const data = userDoc.data();
+    return {
+      id: userDoc.id,
+      uid: data.uid || userDoc.id,
+      name: data.name,
+      email: data.email,
+      role: data.role,
+      status: data.status,
+      companyId: data.companyId,
+      isCompanyOwner: data.isCompanyOwner,
+      canManageSubscription: data.canManageSubscription,
+      isPlatformAdmin: data.isPlatformAdmin,
+      supervisorId: data.supervisorId,
+      createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : data.createdAt,
+      updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : data.updatedAt,
+    };
+  } catch (error) {
+    console.error('Error getting user by ID:', error);
+    return undefined;
+  }
+}
+
 export async function getUserByEmail(email: string): Promise<User | undefined> {
   try {
     const q = query(
@@ -156,6 +186,10 @@ export async function getUserByEmail(email: string): Promise<User | undefined> {
         email: data.email,
         role: data.role,
         status: data.status,
+        companyId: data.companyId,
+        isCompanyOwner: data.isCompanyOwner,
+        canManageSubscription: data.canManageSubscription,
+        isPlatformAdmin: data.isPlatformAdmin,
         supervisorId: data.supervisorId,
         createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : data.createdAt,
         updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : data.updatedAt,

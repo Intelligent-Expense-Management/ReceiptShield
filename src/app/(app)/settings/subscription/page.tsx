@@ -12,7 +12,8 @@ import { PlanSelector } from '@/components/subscription/plan-selector';
 import { getCompanyUsageInfo, hasActiveSubscription } from '@/lib/subscription-middleware';
 import { getCompany } from '@/lib/firebase-company-store';
 import { Calendar, CreditCard, Users, FileText, AlertCircle, CheckCircle, Clock } from 'lucide-react';
-import type { Company, SubscriptionPlanKey } from '@/types';
+import type { Company } from '@/types';
+import type { SubscriptionPlanKey } from '@/lib/stripe';
 
 export default function SubscriptionPage() {
   const { user } = useAuth();
