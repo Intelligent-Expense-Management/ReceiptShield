@@ -55,6 +55,7 @@ export async function createInvitation(
         role: existingData.role,
         supervisorId: existingData.supervisorId,
         invitedBy: existingData.invitedBy,
+        companyId: existingData.companyId || '', // Include companyId from existing invitation
         status: existingData.status,
         token: existingData.token,
         expiresAt: existingData.expiresAt?.toDate() || new Date(),
@@ -111,6 +112,7 @@ export async function createInvitation(
       role: invitationData.role,
       supervisorId: invitationData.supervisorId || undefined,
       invitedBy,
+      companyId: invitationData.companyId, // Store companyId from invitation
       status: 'pending',
       token: generateInvitationToken(),
       expiresAt,
@@ -123,6 +125,7 @@ export async function createInvitation(
       email: invitation.email,
       role: invitation.role,
       invitedBy: invitation.invitedBy,
+      companyId: invitation.companyId, // Include companyId in document
       status: invitation.status,
       token: invitation.token,
       expiresAt: Timestamp.fromDate(expiresAt),
@@ -167,7 +170,13 @@ export async function getInvitations(): Promise<Invitation[]> {
       const data = doc.data();
       return {
         id: doc.id,
-        ...data,
+        email: data.email,
+        role: data.role,
+        supervisorId: data.supervisorId,
+        invitedBy: data.invitedBy,
+        companyId: data.companyId || '', // Include companyId
+        status: data.status,
+        token: data.token,
         expiresAt: data.expiresAt?.toDate() || new Date(),
         createdAt: data.createdAt?.toDate() || new Date(),
         lastSentAt: data.lastSentAt?.toDate(),
@@ -199,7 +208,13 @@ export async function getInvitationByToken(token: string): Promise<Invitation | 
     
     return {
       id: doc.id,
-      ...data,
+      email: data.email,
+      role: data.role,
+      supervisorId: data.supervisorId,
+      invitedBy: data.invitedBy,
+      companyId: data.companyId || '', // Include companyId
+      status: data.status,
+      token: data.token,
       expiresAt: data.expiresAt?.toDate() || new Date(),
       createdAt: data.createdAt?.toDate() || new Date(),
       lastSentAt: data.lastSentAt?.toDate(),
@@ -231,7 +246,13 @@ export async function getPendingInvitationByEmail(email: string): Promise<Invita
     
     return {
       id: doc.id,
-      ...data,
+      email: data.email,
+      role: data.role,
+      supervisorId: data.supervisorId,
+      invitedBy: data.invitedBy,
+      companyId: data.companyId || '', // Include companyId
+      status: data.status,
+      token: data.token,
       expiresAt: data.expiresAt?.toDate() || new Date(),
       createdAt: data.createdAt?.toDate() || new Date(),
       lastSentAt: data.lastSentAt?.toDate(),

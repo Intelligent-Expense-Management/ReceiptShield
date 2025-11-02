@@ -154,7 +154,7 @@ export function ModernSidebar({
         ];
       
       case "admin":
-        return [
+        const adminItems = [
           {
             href: `${basePath}/dashboard`,
             label: "Overview",
@@ -173,12 +173,13 @@ export function ModernSidebar({
             icon: BarChart3,
             badge: null
           },
-          {
+          // Only show System Monitoring for platform admins
+          ...(user?.isPlatformAdmin ? [{
             href: `${basePath}/monitoring`,
             label: "System Monitoring",
             icon: Activity,
             badge: null
-          },
+          }] : []),
           {
             href: `${basePath}/fraud-alerts`,
             label: "Fraud Detection",
@@ -186,6 +187,7 @@ export function ModernSidebar({
             badge: 5
           }
         ];
+        return adminItems;
       
       default:
         return [];

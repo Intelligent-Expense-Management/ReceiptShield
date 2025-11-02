@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Textarea } from "@/components/ui/textarea";
@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { AlertTriangle, Shield, Eye, CheckCircle, XCircle, X, ZoomIn, ExternalLink, Loader2, Clock } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { getAllReceipts } from "@/lib/receipt-store";
+import { useAuth } from "@/contexts/auth-context";
 import type { ProcessedReceipt } from "@/types";
 
 // Interface for fraud alert derived from ProcessedReceipt
@@ -32,6 +33,7 @@ interface FraudAlert {
 
 export default function AdminFraudAlertsPage() {
   const router = useRouter();
+  const { user } = useAuth();
   const [alerts, setAlerts] = useState<FraudAlert[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -351,12 +353,14 @@ export default function AdminFraudAlertsPage() {
   };
 
   // Function to fetch fraudulent receipts with real-time analysis
-  const fetchFraudAlerts = async () => {
+  const fetchFraudAlerts = useCallback(async () => {
     try {
       setIsLoading(true);
-      const allReceipts = await getAllReceipts();
+      // Filter by companyId unless user is platform admin
+      const companyId = user?.isPlatformAdmin ? undefined : user?.companyId;
+      const allReceipts = await getAllReceipts(undefined, companyId);
       
-      console.log('Analyzing', allReceipts.length, 'receipts for fraud...');
+      console.log('Analyzing', allReceipts.length, 'receipts for fraud...', companyId ? `for company ${companyId}` : '(all companies)');
       
       // Perform real-time fraud analysis on all receipts
       const fraudAlerts: FraudAlert[] = [];
@@ -391,12 +395,14 @@ export default function AdminFraudAlertsPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user?.companyId, user?.isPlatformAdmin]);
 
-  // Load fraud alerts on component mount
+  // Load fraud alerts on component mount and when user/companyId changes
   useEffect(() => {
-    fetchFraudAlerts();
-  }, []);
+    if (user) {
+      fetchFraudAlerts();
+    }
+  }, [user, fetchFraudAlerts]);
 
   const handleApprove = (id: string) => {
     setAlerts(prev => prev.map(alert => 

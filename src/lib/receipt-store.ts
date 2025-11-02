@@ -35,8 +35,8 @@ export async function getReceiptById(id: string): Promise<ProcessedReceipt | und
   return receipt || undefined;
 }
 
-export async function getAllReceipts(): Promise<ProcessedReceipt[]> {
-  return await getAllReceiptsFromFirestore();
+export async function getAllReceipts(limitCount?: number, companyId?: string): Promise<ProcessedReceipt[]> {
+  return await getAllReceiptsFromFirestore(limitCount, companyId);
 }
 
 export async function getAllSubmittedReceipts(): Promise<ProcessedReceipt[]> {

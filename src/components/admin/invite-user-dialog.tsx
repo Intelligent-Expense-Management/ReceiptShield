@@ -140,8 +140,17 @@ export function InviteUserDialog({
 
   const loadManagers = async () => {
     try {
+      if (!currentUser?.companyId) {
+        setManagers([]);
+        return;
+      }
       const allUsers = await getUsers();
-      const managerUsers = allUsers.filter(user => user.role === 'manager' && user.status === 'active');
+      // Filter by companyId and role to only show managers from the same company
+      const managerUsers = allUsers.filter(
+        user => user.role === 'manager' && 
+        user.status === 'active' && 
+        user.companyId === currentUser.companyId
+      );
       setManagers(managerUsers);
     } catch (error) {
       console.error('Error loading managers:', error);
@@ -237,11 +246,16 @@ export function InviteUserDialog({
     setEmailError(null);
 
     try {
+      if (!currentUser?.companyId) {
+        throw new Error('You must be associated with a company to send invitations');
+      }
+
       const invitationData: InvitationRequest = {
         email: data.email,
         role: data.role,
         supervisorId: data.supervisorId || undefined,
         message: data.message || undefined,
+        companyId: currentUser.companyId, // Include companyId so users are assigned to the correct company
       };
 
       // Send invitation

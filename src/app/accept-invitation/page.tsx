@@ -131,6 +131,16 @@ function AcceptInvitationContent() {
       });
 
       // Create the user record in Firestore
+      // Use companyId from invitation if available, otherwise try to get it from inviting user
+      let companyId: string | undefined = invitation.companyId;
+      
+      if (!companyId) {
+        // Fallback: get companyId from inviting user (for backwards compatibility)
+        const { getUserById } = await import('@/lib/firebase-user-store');
+        const invitingUser = await getUserById(invitation.invitedBy);
+        companyId = invitingUser?.companyId;
+      }
+
       const userId = await addUser({
         name: data.name,
         email: invitation.email,
@@ -138,17 +148,14 @@ function AcceptInvitationContent() {
         supervisorId: invitation.supervisorId,
         status: 'active',
         uid: userCredential.user.uid,
+        companyId: companyId, // Assign user to the company from invitation
       });
 
       // Record user addition for subscription usage tracking
-      // Get companyId from the invitation's invitedBy user's companyId
-      // Note: This assumes invitations store companyId - if not, we'll need to fetch it from the inviting user
-      const { getUserById } = await import('@/lib/firebase-user-store');
       const { recordUserAddition } = await import('@/lib/subscription-middleware');
       try {
-        const invitingUser = await getUserById(invitation.invitedBy);
-        if (invitingUser?.companyId) {
-          await recordUserAddition(invitingUser.companyId);
+        if (companyId) {
+          await recordUserAddition(companyId);
         }
       } catch (error) {
         console.error('Error recording user addition:', error);

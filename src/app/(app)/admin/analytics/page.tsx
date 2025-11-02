@@ -1,16 +1,18 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Building2, Users, DollarSign, TrendingUp, AlertTriangle, CheckCircle, Clock, Loader2 } from "lucide-react";
-import { getAllUsers } from "@/lib/firebase-auth";
+import { getUsers } from "@/lib/firebase-user-store";
 import { getAllReceipts } from "@/lib/receipt-store";
+import { useAuth } from "@/contexts/auth-context";
 import type { User } from "@/types";
 import type { ProcessedReceipt } from "@/types";
 
 export default function AdminAnalyticsPage() {
+  const { user: currentUser } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [orgData, setOrgData] = useState({
     totalUsers: 0,
@@ -47,18 +49,25 @@ export default function AdminAnalyticsPage() {
   ]);
 
   // Real-time data fetching functions
-  const fetchRealAnalyticsData = async () => {
+  const fetchRealAnalyticsData = useCallback(async () => {
     try {
       setIsLoading(true);
       console.log('Fetching real analytics data...');
 
-      // Fetch all users and receipts
+      // Filter by companyId unless user is platform admin
+      const companyId = currentUser?.isPlatformAdmin ? undefined : currentUser?.companyId;
+
+      // Fetch all users and receipts filtered by company
       const [users, receipts] = await Promise.all([
-        getAllUsers(),
-        getAllReceipts()
+        getUsers(companyId),
+        getAllReceipts(undefined, companyId)
       ]);
 
-      console.log('Fetched data:', { users: users.length, receipts: receipts.length });
+      console.log('Fetched data:', { 
+        users: users.length, 
+        receipts: receipts.length,
+        companyId: companyId || '(all companies)'
+      });
 
       // Calculate real metrics
       const totalUsers = users.length;
@@ -136,7 +145,7 @@ export default function AdminAnalyticsPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [currentUser?.companyId, currentUser?.isPlatformAdmin]);
 
   // Calculate department spending
   const calculateDepartmentSpending = (users: User[], receipts: ProcessedReceipt[]) => {
@@ -272,10 +281,12 @@ export default function AdminAnalyticsPage() {
     ];
   };
 
-  // Load data on component mount
+  // Load data on component mount and when user/companyId changes
   useEffect(() => {
-    fetchRealAnalyticsData();
-  }, []);
+    if (currentUser) {
+      fetchRealAnalyticsData();
+    }
+  }, [currentUser, fetchRealAnalyticsData]);
 
   const getSeverityColor = (severity: string) => {
     switch (severity) {
