@@ -1,5 +1,4 @@
 import { getCompany, updateCompanySubscription } from './firebase-company-store';
-import type { Company } from '@/types';
 
 /**
  * Check if a company's trial has expired and subscription is not active

@@ -35,7 +35,7 @@ export type SummarizeReceiptInput = z.infer<typeof SummarizeReceiptInputSchema>;
 export type SummarizeReceiptOutput = z.infer<typeof SummarizeReceiptOutputSchema>;
 
 // Simplified fallback implementation when AI is not available
-const summarizeReceiptFlow = async (input: SummarizeReceiptInput): Promise<SummarizeReceiptOutput> => {
+const summarizeReceiptFlow = async (_input: SummarizeReceiptInput): Promise<SummarizeReceiptOutput> => {
   try {
     console.log('🔍 Starting receipt analysis (fallback mode)...');
     

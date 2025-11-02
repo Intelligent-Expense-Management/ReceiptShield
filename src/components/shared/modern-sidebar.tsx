@@ -153,7 +153,7 @@ export function ModernSidebar({
           }
         ];
       
-      case "admin":
+      case "admin": {
         const adminItems = [
           {
             href: `${basePath}/dashboard`,
@@ -188,6 +188,7 @@ export function ModernSidebar({
           }
         ];
         return adminItems;
+      }
       
       default:
         return [];

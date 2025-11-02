@@ -18,18 +18,8 @@ export default function AdminDashboardPage() {
   const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
   const router = useRouter();
 
-  console.log('🔍 AdminDashboard rendered:', { 
-    user: !!user, 
-    userId: user?.id,
-    companyId: user?.companyId,
-    isCompanyOwner: user?.isCompanyOwner,
-    isInviteDialogOpen, 
-    isLoading 
-  });
-
   useEffect(() => {
     if (!isLoading && !user) {
-      console.log('❌ No user found, redirecting to login');
       router.push('/login');
     }
   }, [user, isLoading, router]);

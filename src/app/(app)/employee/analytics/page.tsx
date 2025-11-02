@@ -1,12 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { TrendingUp, TrendingDown, DollarSign, Receipt } from "lucide-react";
+import { TrendingUp, DollarSign, Receipt } from "lucide-react";
 
 export default function EmployeeAnalyticsPage() {
-  const [analytics, setAnalytics] = useState({
+  const [analytics] = useState({
     totalSpent: 2450.00,
     averagePerReceipt: 89.50,
     topCategory: "Meals",

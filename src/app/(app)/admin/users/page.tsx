@@ -16,7 +16,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import type { User } from "@/types";
-import type { ProcessedReceipt } from "@/types";
 
 // Interface for user with spending data
 interface UserWithSpending extends User {
@@ -89,7 +88,6 @@ export default function AdminUsersPage() {
   const fetchRealUsersData = useCallback(async () => {
     try {
       setIsLoading(true);
-      console.log('Fetching real users data...');
 
       // Filter by companyId unless user is platform admin
       const companyId = currentUser?.isPlatformAdmin ? undefined : currentUser?.companyId;
@@ -99,12 +97,6 @@ export default function AdminUsersPage() {
         getUsers(companyId),
         getAllReceipts(undefined, companyId)
       ]);
-
-      console.log('Fetched data:', { 
-        users: allUsers.length, 
-        receipts: allReceipts.length,
-        companyId: companyId || '(all companies)'
-      });
 
       // Calculate spending per user
       const userSpendingMap = new Map<string, { totalSpending: number; receipts: number }>();
@@ -175,14 +167,6 @@ export default function AdminUsersPage() {
         totalSpending,
         averagePerUser,
         pendingInvitations: 0 // TODO: Get from invitations table
-      });
-
-      console.log('Users data updated:', {
-        totalUsers,
-        activeUsers,
-        inactiveUsers,
-        totalSpending,
-        averagePerUser
       });
 
     } catch (error) {

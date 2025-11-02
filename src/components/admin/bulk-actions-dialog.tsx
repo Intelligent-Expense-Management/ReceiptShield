@@ -221,9 +221,10 @@ export function BulkActionsDialog({
         return `Deactivate ${canDeactivate.length} user${canDeactivate.length !== 1 ? 's' : ''}?`;
       case 'changeRole':
         return `Change role to ${newRole} for ${canChangeRole.length} user${canChangeRole.length !== 1 ? 's' : ''}?`;
-      case 'reassignSupervisor':
+      case 'reassignSupervisor': {
         const supervisor = managers.find(m => m.id === supervisorId);
         return `Reassign ${employeesOnly.length} employee${employeesOnly.length !== 1 ? 's' : ''} to ${supervisor?.name || 'selected supervisor'}?`;
+      }
       default:
         return '';
     }
