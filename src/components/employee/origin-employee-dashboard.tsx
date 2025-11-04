@@ -169,7 +169,7 @@ export function OriginEmployeeDashboard() {
           title="Submit New Receipt"
           subtitle="Upload and process a receipt"
           icon={<Upload className="h-5 w-5" />}
-          onClick={() => router.push('/employee/submit-receipt')}
+          onClick={() => router.push('/employee/upload')}
           className="hover:shadow-lg"
         >
           <div className="flex items-center justify-between mt-4">

@@ -180,7 +180,7 @@ export default function EmployeeReceiptsPage() {
                 <p className="text-muted-foreground mb-6">
                   You haven't submitted any receipts yet. Start by uploading your first receipt.
                 </p>
-                <Button onClick={() => router.push('/employee/submit-receipt')}>
+                <Button onClick={() => router.push('/employee/upload')}>
                   Submit Your First Receipt
                 </Button>
               </CardContent>

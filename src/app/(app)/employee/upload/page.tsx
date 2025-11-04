@@ -5,7 +5,6 @@
 import ReceiptUploadForm from '@/components/employee/receipt-upload-form';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useRouter } from 'next/navigation';
 
 export default function UploadReceiptPage() {
@@ -17,9 +16,6 @@ export default function UploadReceiptPage() {
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Dashboard
         </Button>
-      </div>
-      <div className="bg-red-500 text-white p-4 mb-4 rounded">
-        🚨 TEST: This page was updated at {new Date().toISOString()} - If you see this, deployment is working!
       </div>
       <ReceiptUploadForm />
     </div>

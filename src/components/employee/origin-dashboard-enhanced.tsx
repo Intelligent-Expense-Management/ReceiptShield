@@ -225,7 +225,7 @@ export function OriginDashboardEnhanced({ user }: OriginDashboardEnhancedProps) 
                 title="No Receipts Yet"
                 description="Submit your first receipt to get started"
                 buttonText="Submit Receipt"
-                buttonLink="/employee/submit-receipt"
+                buttonLink="/employee/upload"
               />
             )}
           </CardContent>

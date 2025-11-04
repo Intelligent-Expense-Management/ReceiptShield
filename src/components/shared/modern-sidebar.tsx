@@ -108,8 +108,8 @@ export function ModernSidebar({
             badge: null
           },
           {
-            href: `${basePath}/submit-receipt`,
-            label: "Submit Receipt",
+            href: `${basePath}/upload`,
+            label: "Upload Receipt",
             icon: ReceiptText,
             badge: null
           },

@@ -53,7 +53,7 @@ export default function EmployeeAIAssistantPage() {
     }
     
     if (message.includes("receipt") || message.includes("submit")) {
-      return "To submit a receipt, go to the Submit Receipt page and upload a clear photo. Make sure the receipt shows the vendor name, date, amount, and items purchased. The system will automatically categorize it for you.";
+      return "To submit a receipt, go to the Upload Receipt page and upload a clear photo. Make sure the receipt shows the vendor name, date, amount, and items purchased. The system will automatically categorize it for you.";
     }
     
     if (message.includes("save") || message.includes("optimize")) {

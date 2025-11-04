@@ -99,7 +99,7 @@ export function Chatbot({ isOpen, onClose }: ChatbotProps) {
         assistantMessage.action = {
           label: 'Upload a Receipt',
           onClick: () => {
-            router.push('/employee/submit-receipt');
+            router.push('/employee/upload');
             onClose();
           },
         };
