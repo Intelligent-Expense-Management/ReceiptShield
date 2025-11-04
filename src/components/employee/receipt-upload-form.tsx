@@ -219,54 +219,146 @@ export default function ReceiptUploadForm() {
       updateStep('ocr', 'completed', 100);
       setUploadProgress(50);
 
-      // Step 3: Fraud Detection with ML prediction
+      // Step 3: Fraud Detection with ML prediction and AI analysis
       updateStep('fraud', 'in_progress', 0);
       
-      // Get ML prediction
-      let mlPrediction = null;
-      try {
-        console.log('🤖 Calling ML prediction API...');
-        
-        // Prepare receipt data for ML model
-        const receiptData = {
-          amount: ocrResult.extractedItems?.find(item => 
-            item.label.toLowerCase().includes('total') || 
-            item.label.toLowerCase().includes('amount')
-          )?.value || '0',
-          merchant: ocrResult.extractedItems?.find(item => 
-            item.label.toLowerCase().includes('vendor') || 
-            item.label.toLowerCase().includes('store')
-          )?.value || 'Unknown',
-          category: 'Business Expense', // Default category
-          items: ocrResult.extractedItems || []
-        };
+      // Prepare receipt data for analysis
+      const receiptDataForAnalysis = {
+        amount: ocrResult.extractedItems?.find(item => 
+          item.label.toLowerCase().includes('total') || 
+          item.label.toLowerCase().includes('amount')
+        )?.value || '0',
+        merchant: ocrResult.extractedItems?.find(item => 
+          item.label.toLowerCase().includes('vendor') || 
+          item.label.toLowerCase().includes('store')
+        )?.value || 'Unknown',
+        date: ocrResult.extractedItems?.find(item => 
+          item.label.toLowerCase().includes('date')
+        )?.value || new Date().toISOString(),
+        category: 'Business Expense', // Default category
+      };
 
-        const mlResponse = await fetch('/api/ml-predict', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(receiptData)
-        });
+      // Get ML prediction (parallel with AI analysis)
+      let mlPrediction: any = null;
+      const mlPromise = (async () => {
+        try {
+          console.log('🤖 Calling ML prediction API...');
+          
+          const mlResponse = await fetch('/api/ml-predict', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              items: ocrResult.extractedItems || [],
+              ...receiptDataForAnalysis
+            })
+          });
 
-        if (mlResponse.ok) {
-          const mlData = await mlResponse.json();
-          mlPrediction = mlData.prediction;
-          console.log('✅ ML prediction received:', mlPrediction);
-        } else {
-          console.warn('⚠️ ML prediction failed:', mlResponse.status);
+          if (mlResponse.ok) {
+            const mlData = await mlResponse.json();
+            mlPrediction = mlData.prediction;
+            console.log('✅ ML prediction received:', mlPrediction);
+          } else {
+            console.warn('⚠️ ML prediction failed:', mlResponse.status);
+          }
+        } catch (mlError) {
+          console.warn('⚠️ ML prediction error:', mlError);
         }
-      } catch (mlError) {
-        console.warn('⚠️ ML prediction error:', mlError);
+      })();
+
+      // Get AI analysis using Google Gemini (parallel with ML)
+      let aiDetection: any = null;
+      const aiPromise = (async () => {
+        try {
+          console.log('🤖 Calling AI fraud analysis API...');
+          
+          const aiResponse = await fetch('/api/ai-fraud-analysis', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              items: ocrResult.extractedItems || [],
+              imageUrl: uploadResult.url,
+              receiptData: receiptDataForAnalysis
+            })
+          });
+
+          if (aiResponse.ok) {
+            const aiData = await aiResponse.json();
+            aiDetection = {
+              fraudulent: aiData.fraudulent || false,
+              fraudProbability: aiData.fraudProbability || 0.1,
+              explanation: aiData.explanation || 'AI analysis completed. No fraud indicators detected.',
+              riskFactors: aiData.riskFactors || [],
+              confidence: aiData.confidence || 0.7
+            };
+            console.log('✅ AI analysis received:', aiDetection);
+          } else {
+            console.warn('⚠️ AI analysis failed:', aiResponse.status);
+            // Fallback if AI analysis fails
+            aiDetection = {
+              fraudulent: false,
+              fraudProbability: 0.1,
+              explanation: 'AI analysis was not available at the time of processing. Receipt will be reviewed manually.',
+              riskFactors: [],
+              confidence: 0.3
+            };
+          }
+        } catch (aiError) {
+          console.warn('⚠️ AI analysis error:', aiError);
+          // Fallback if AI analysis fails
+          aiDetection = {
+            fraudulent: false,
+            fraudProbability: 0.1,
+            explanation: 'AI analysis encountered an error. Receipt will be reviewed manually.',
+            riskFactors: [],
+            confidence: 0.3
+          };
+        }
+      })();
+
+      // Wait for both analyses to complete
+      await Promise.all([mlPromise, aiPromise]);
+
+      // Determine overall fraud status based on both ML and AI analysis
+      const mlSaysFraud = mlPrediction?.is_fraudulent || false;
+      const aiSaysFraud = aiDetection?.fraudulent || false;
+      const isActuallyFraudulent = mlSaysFraud || aiSaysFraud;
+      
+      // Calculate combined fraud probability (weighted average)
+      const mlWeight = 0.6;
+      const aiWeight = 0.4;
+      const combinedFraudProbability = (
+        (mlPrediction?.fraud_probability || 0.1) * mlWeight +
+        (aiDetection?.fraudProbability || 0.1) * aiWeight
+      );
+
+      // Determine overall risk level
+      let overallRisk: 'LOW' | 'MEDIUM' | 'HIGH' = 'LOW';
+      if (combinedFraudProbability >= 0.7) {
+        overallRisk = 'HIGH';
+      } else if (combinedFraudProbability >= 0.4) {
+        overallRisk = 'MEDIUM';
       }
 
-      // Create fraud analysis with ML prediction
+      // Combine explanations
+      let explanation = '';
+      if (mlPrediction) {
+        explanation += `ML Analysis: ${mlPrediction.risk_level} risk (${(mlPrediction.fraud_probability * 100).toFixed(1)}% fraud probability). `;
+      }
+      if (aiDetection && aiDetection.explanation) {
+        explanation += `AI Analysis: ${aiDetection.explanation}`;
+      }
+      if (!explanation) {
+        explanation = 'Receipt processed successfully. No fraud detected.';
+      }
+
       const fraudResult = {
-        isFraudulent: mlPrediction?.is_fraudulent || false,
-        fraudProbability: mlPrediction?.fraud_probability || 0.1,
-        explanation: mlPrediction ? 
-          `ML Analysis: ${mlPrediction.risk_level} risk (${(mlPrediction.fraud_probability * 100).toFixed(1)}% fraud probability)` :
-          'Receipt processed successfully. No fraud detected.',
+        isFraudulent: isActuallyFraudulent,
+        fraudProbability: combinedFraudProbability,
+        explanation: explanation.trim(),
         riskFactors: {
           imageQuality: 'good' as const,
           extractionConfidence: 'high' as const,
@@ -282,7 +374,8 @@ export default function ReceiptUploadForm() {
           submissionId: receiptId,
           receiptId: receiptId,
           ml_prediction: mlPrediction,
-          overall_risk_assessment: (mlPrediction?.risk_level || 'LOW') as 'LOW' | 'MEDIUM' | 'HIGH',
+          ai_detection: aiDetection,
+          overall_risk_assessment: overallRisk,
           analysis_timestamp: new Date().toISOString(),
           duplicateDetection: {
             isDuplicate: false,
@@ -303,6 +396,15 @@ export default function ReceiptUploadForm() {
 
       // Step 4: Save receipt data
       updateStep('save', 'in_progress', 0);
+      
+      // Log AI detection before saving
+      console.log('💾 Preparing receipt data for save:', {
+        hasAiDetection: !!aiDetection,
+        aiDetection: aiDetection,
+        hasMlPrediction: !!mlPrediction,
+        overallRisk: overallRisk
+      });
+      
       const receiptData: Omit<ProcessedReceipt, 'id'> = {
         fileName: selectedFile.name,
         imageUrl: uploadResult.url,
@@ -319,8 +421,19 @@ export default function ReceiptUploadForm() {
         isDraft: false,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
+        fraud_analysis: {
+          ml_prediction: mlPrediction || undefined,
+          ai_detection: aiDetection ? {
+            fraudulent: aiDetection.fraudulent,
+            fraudProbability: aiDetection.fraudProbability,
+            explanation: aiDetection.explanation
+          } : undefined,
+          overall_risk_assessment: overallRisk,
+          analysis_timestamp: new Date().toISOString(),
+        },
       };
 
+      console.log('💾 Receipt data with fraud_analysis:', JSON.stringify(receiptData.fraud_analysis, null, 2));
       const savedReceiptId = await addReceipt(receiptData);
       
       // Record receipt upload for subscription usage tracking

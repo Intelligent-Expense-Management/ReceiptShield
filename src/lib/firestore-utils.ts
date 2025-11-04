@@ -8,14 +8,37 @@
 /**
  * Remove undefined and null values from an object
  * This prevents Firestore errors when trying to store undefined values
+ * Recursively cleans nested objects but preserves object structure
  * 
  * @param obj - The object to clean
  * @returns A new object with undefined and null values removed
  */
 export function cleanFirestoreData<T extends Record<string, any>>(obj: T): Partial<T> {
-  return Object.fromEntries(
-    Object.entries(obj).filter(([_, value]) => value !== undefined && value !== null)
-  ) as Partial<T>;
+  const cleaned: any = {};
+  
+  for (const [key, value] of Object.entries(obj)) {
+    // Skip undefined and null values
+    if (value === undefined || value === null) {
+      continue;
+    }
+    
+    // Check if it's a Firestore Timestamp (has toDate method) or other special types
+    const isFirestoreTimestamp = typeof value === 'object' && value !== null && 'toDate' in value && typeof value.toDate === 'function';
+    
+    // If it's an object (but not an array, Date, or Firestore Timestamp), recursively clean it
+    if (typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date) && !isFirestoreTimestamp) {
+      const cleanedNested = cleanFirestoreData(value);
+      // Only include if the nested object has at least one property
+      if (Object.keys(cleanedNested).length > 0) {
+        cleaned[key] = cleanedNested;
+      }
+    } else {
+      // For primitives, arrays, Dates, Firestore Timestamps, etc., include as-is
+      cleaned[key] = value;
+    }
+  }
+  
+  return cleaned as Partial<T>;
 }
 
 /**

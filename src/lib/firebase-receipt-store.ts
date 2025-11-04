@@ -36,11 +36,21 @@ export async function addReceipt(receipt: Omit<ProcessedReceipt, 'id'>): Promise
       updatedAt: Timestamp.now(),
     };
 
-    // Remove any remaining undefined values
+    // Remove any remaining undefined values, but preserve nested objects
     const finalReceiptData = cleanFirestoreData(receiptData);
+    
+    // Debug logging for fraud_analysis before save
+    if (finalReceiptData.fraud_analysis) {
+      console.log('💾 Saving receipt with fraud_analysis:', {
+        hasMlPrediction: !!finalReceiptData.fraud_analysis.ml_prediction,
+        hasAiDetection: !!finalReceiptData.fraud_analysis.ai_detection,
+        aiDetection: finalReceiptData.fraud_analysis.ai_detection,
+        overallRisk: finalReceiptData.fraud_analysis.overall_risk_assessment
+      });
+    }
 
     const docRef = await addDoc(collection(db, RECEIPTS_COLLECTION), finalReceiptData);
-    console.log('Receipt added to Firestore:', docRef.id);
+    console.log('✅ Receipt added to Firestore:', docRef.id);
     return docRef.id;
   } catch (error) {
     console.error('Error adding receipt to Firestore:', error);
@@ -146,7 +156,7 @@ export async function getReceipt(receiptId: string): Promise<ProcessedReceipt | 
     }
 
     const data = receiptSnap.data();
-    return {
+    const receipt = {
       id: receiptSnap.id,
       ...data,
       uploadedAt: data.uploadedAt instanceof Timestamp 
@@ -159,6 +169,20 @@ export async function getReceipt(receiptId: string): Promise<ProcessedReceipt | 
         ? data.updatedAt.toDate().toISOString() 
         : data.updatedAt,
     } as ProcessedReceipt;
+    
+    // Debug logging for fraud_analysis
+    if (receipt.fraud_analysis) {
+      console.log('📊 Receipt fraud_analysis loaded:', {
+        hasMlPrediction: !!receipt.fraud_analysis.ml_prediction,
+        hasAiDetection: !!receipt.fraud_analysis.ai_detection,
+        aiDetection: receipt.fraud_analysis.ai_detection,
+        overallRisk: receipt.fraud_analysis.overall_risk_assessment
+      });
+    } else {
+      console.warn('⚠️ Receipt loaded without fraud_analysis field');
+    }
+    
+    return receipt;
   } catch (error) {
     console.error('Error getting receipt from Firestore:', error);
     throw new Error(`Failed to get receipt: ${error instanceof Error ? error.message : 'Unknown error'}`);
