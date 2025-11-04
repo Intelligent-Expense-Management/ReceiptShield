@@ -52,6 +52,28 @@ def generate_fraudulent_vendor_name(fraud_type):
             "Items Store",
             "Business Expenses Inc"
         ])
+    elif fraud_type == "generic":
+        # Generic vendor names
+        return random.choice([
+            "Store",
+            "Shop",
+            "Market",
+            "Business",
+            "Vendor",
+            "Company",
+            "Inc",
+            "LLC"
+        ])
+    elif fraud_type == "all_caps":
+        # All caps vendor names (suspicious)
+        return random.choice([
+            "STORE",
+            "SHOP HERE",
+            "MARKET PLACE",
+            "BUSINESS EXPENSES",
+            "VENDOR NAME",
+            "COMPANY NAME"
+        ])
     else:
         return fake.company()
 
@@ -111,18 +133,19 @@ def calculate_fraudulent_total(items, fraud_type):
     subtotal = sum(price for _, price in items)
     tax = round(subtotal * 0.08, 2)
     expected_total = subtotal + tax
+    tip = 0
     
     if fraud_type == "total_mismatch":
         # Obvious total calculation errors
         total = expected_total + random.choice([-50.0, 25.99, 100.0, -15.75])
-        return round(subtotal, 2), round(tax, 2), round(total, 2)
+        return round(subtotal, 2), round(tax, 2), round(total, 2), tip
     
     elif fraud_type == "round_numbers":
         # Suspiciously round numbers (common in fake receipts)
         total = random.choice([100.00, 150.00, 200.00, 250.00, 300.00, 500.00])
         tax = round(total * 0.08 / 1.08, 2)
         subtotal = total - tax
-        return round(subtotal, 2), round(tax, 2), round(total, 2)
+        return round(subtotal, 2), round(tax, 2), round(total, 2), tip
     
     elif fraud_type == "excessive_tip":
         # Suspicious tip patterns
@@ -131,15 +154,43 @@ def calculate_fraudulent_total(items, fraud_type):
         total = expected_total + tip
         return round(subtotal, 2), round(tax, 2), round(total, 2), round(tip, 2)
     
+    elif fraud_type == "high_amount":
+        # High amount for late night/month end fraud
+        total = random.choice([500.00, 750.00, 1000.00, 1500.00])
+        tax = round(total * 0.08 / 1.08, 2)
+        subtotal = total - tax
+        return round(subtotal, 2), round(tax, 2), round(total, 2), tip
+    
+    elif fraud_type == "tax_anomaly":
+        # Unusual tax rates (too low or too high)
+        tax_rate = random.choice([0.03, 0.20, 0.25])  # 3% or 20-25% (unusual)
+        tax = round(subtotal * tax_rate, 2)
+        total = subtotal + tax
+        return round(subtotal, 2), round(tax, 2), round(total, 2), tip
+    
+    elif fraud_type == "zero":
+        # Zero amount (suspicious)
+        return 0.0, 0.0, 0.0, 0.0
+    
+    elif fraud_type == "extreme":
+        # Extreme values
+        total = random.choice([15000.00, 20000.00, 25000.00])
+        tax = round(total * 0.08 / 1.08, 2)
+        subtotal = total - tax
+        return round(subtotal, 2), round(tax, 2), round(total, 2), tip
+    
     else:
-        return round(subtotal, 2), round(tax, 2), round(expected_total, 2)
+        return round(subtotal, 2), round(tax, 2), round(expected_total, 2), tip
 
-def generate_suspicious_date():
+def generate_suspicious_date(fraud_type=None):
     """Generate dates that might trigger fraud flags"""
     now = datetime.now()
     
     # Choose fraud pattern
-    pattern = random.choice(["weekend", "month_end", "holiday", "late_night", "duplicate_day"])
+    if fraud_type:
+        pattern = fraud_type
+    else:
+        pattern = random.choice(["weekend", "month_end", "holiday", "late_night", "duplicate_day", "future_date", "very_old"])
     
     if pattern == "weekend":
         # Weekend submissions (higher fraud risk)
@@ -152,12 +203,26 @@ def generate_suspicious_date():
     
     elif pattern == "month_end":
         # Month-end submissions (expense report deadlines)
-        return now.replace(day=random.choice([28, 29, 30, 31]))
+        base_date = now - timedelta(days=random.randint(1, 7))
+        return base_date.replace(day=random.choice([28, 29, 30, 31]))
     
     elif pattern == "late_night":
         # Unusual hours
         base_date = now - timedelta(days=random.randint(1, 15))
         return base_date.replace(hour=random.choice([2, 3, 4, 23]), minute=random.randint(0, 59))
+    
+    elif pattern == "future_date":
+        # Future dates (impossible)
+        return now + timedelta(days=random.randint(1, 30))
+    
+    elif pattern == "very_old":
+        # Very old receipts (over 1 year)
+        return now - timedelta(days=random.randint(400, 1000))
+    
+    elif pattern == "quarter_end":
+        # Quarter-end submissions
+        base_date = now - timedelta(days=random.randint(1, 7))
+        return base_date.replace(month=random.choice([3, 6, 9, 12]), day=random.choice([28, 29, 30, 31]))
     
     else:
         return fake.date_time_this_year()
@@ -192,18 +257,33 @@ def add_visual_fraud_indicators(image, fraud_type):
     
     return image
 
-def generate_payment_method_fraud():
+def generate_payment_method_fraud(fraud_type=None):
     """Generate suspicious payment methods"""
-    return random.choice([
-        "",  # Missing payment method
-        "CASH ONLY",
-        "Personal Card",
-        "Gift Card",
-        "Store Credit",
-        "Comp",
-        "Employee Discount",
-        "Unknown"
-    ])
+    if fraud_type == "missing":
+        return ""
+    elif fraud_type == "suspicious":
+        return random.choice([
+            "CASH ONLY",
+            "Personal Card",
+            "Gift Card",
+            "Store Credit",
+            "Comp",
+            "Employee Discount",
+            "Unknown",
+            "TEST123!!!",
+            "Cash@Store"
+        ])
+    else:
+        return random.choice([
+            "",  # Missing payment method
+            "CASH ONLY",
+            "Personal Card",
+            "Gift Card",
+            "Store Credit",
+            "Comp",
+            "Employee Discount",
+            "Unknown"
+        ])
 
 def create_fraudulent_receipt(fraud_scenario, receipt_id):
     """Create a fraudulent receipt based on specific fraud scenario"""
@@ -218,49 +298,153 @@ def create_fraudulent_receipt(fraud_scenario, receipt_id):
             "vendor_type": "normal",
             "items_type": "normal", 
             "total_type": "total_mismatch",
-            "visual_fraud": None
+            "visual_fraud": None,
+            "date_type": "normal",
+            "payment_type": "normal"
         },
         "gibberish_vendor": {
             "vendor_type": "gibberish",
             "items_type": "normal",
             "total_type": "normal",
-            "visual_fraud": None
+            "visual_fraud": None,
+            "date_type": "normal",
+            "payment_type": "normal"
         },
         "high_personal_expense": {
             "vendor_type": "suspicious",
             "items_type": "high_personal_expense",
             "total_type": "normal",
-            "visual_fraud": None
+            "visual_fraud": None,
+            "date_type": "normal",
+            "payment_type": "normal"
         },
         "price_inflation": {
             "vendor_type": "normal",
             "items_type": "price_inflation",
             "total_type": "normal", 
-            "visual_fraud": None
+            "visual_fraud": None,
+            "date_type": "normal",
+            "payment_type": "normal"
         },
         "round_numbers": {
             "vendor_type": "normal",
             "items_type": "normal",
             "total_type": "round_numbers",
-            "visual_fraud": None
+            "visual_fraud": None,
+            "date_type": "normal",
+            "payment_type": "normal"
         },
         "excessive_tip": {
             "vendor_type": "normal",
             "items_type": "normal",
             "total_type": "excessive_tip",
-            "visual_fraud": None
+            "visual_fraud": None,
+            "date_type": "normal",
+            "payment_type": "normal"
         },
         "poor_quality": {
             "vendor_type": "normal",
             "items_type": "normal",
             "total_type": "normal",
-            "visual_fraud": "poor_quality"
+            "visual_fraud": "poor_quality",
+            "date_type": "normal",
+            "payment_type": "normal"
         },
         "editing_artifacts": {
             "vendor_type": "normal",
             "items_type": "normal",
             "total_type": "normal",
-            "visual_fraud": "editing_artifacts"
+            "visual_fraud": "editing_artifacts",
+            "date_type": "normal",
+            "payment_type": "normal"
+        },
+        "future_date": {
+            "vendor_type": "normal",
+            "items_type": "normal",
+            "total_type": "normal",
+            "visual_fraud": None,
+            "date_type": "future_date",
+            "payment_type": "normal"
+        },
+        "very_old_date": {
+            "vendor_type": "normal",
+            "items_type": "normal",
+            "total_type": "normal",
+            "visual_fraud": None,
+            "date_type": "very_old",
+            "payment_type": "normal"
+        },
+        "missing_payment": {
+            "vendor_type": "normal",
+            "items_type": "normal",
+            "total_type": "normal",
+            "visual_fraud": None,
+            "date_type": "normal",
+            "payment_type": "missing"
+        },
+        "suspicious_payment": {
+            "vendor_type": "normal",
+            "items_type": "normal",
+            "total_type": "normal",
+            "visual_fraud": None,
+            "date_type": "normal",
+            "payment_type": "suspicious"
+        },
+        "late_night_high_amount": {
+            "vendor_type": "normal",
+            "items_type": "normal",
+            "total_type": "high_amount",
+            "visual_fraud": None,
+            "date_type": "late_night",
+            "payment_type": "normal"
+        },
+        "month_end_fraud": {
+            "vendor_type": "normal",
+            "items_type": "normal",
+            "total_type": "high_amount",
+            "visual_fraud": None,
+            "date_type": "month_end",
+            "payment_type": "normal"
+        },
+        "generic_vendor": {
+            "vendor_type": "generic",
+            "items_type": "normal",
+            "total_type": "normal",
+            "visual_fraud": None,
+            "date_type": "normal",
+            "payment_type": "normal"
+        },
+        "all_caps_vendor": {
+            "vendor_type": "all_caps",
+            "items_type": "normal",
+            "total_type": "normal",
+            "visual_fraud": None,
+            "date_type": "normal",
+            "payment_type": "normal"
+        },
+        "tax_rate_anomaly": {
+            "vendor_type": "normal",
+            "items_type": "normal",
+            "total_type": "tax_anomaly",
+            "visual_fraud": None,
+            "date_type": "normal",
+            "payment_type": "normal"
+        },
+        "zero_amount": {
+            "vendor_type": "normal",
+            "items_type": "normal",
+            "total_type": "zero",
+            "visual_fraud": None,
+            "date_type": "normal",
+            "payment_type": "normal"
+        },
+        "extreme_values": {
+            "vendor_type": "normal",
+            "items_type": "normal",
+            "total_type": "extreme",
+            "visual_fraud": None,
+            "date_type": "normal",
+            "payment_type": "normal"
         }
     }
     
@@ -269,8 +453,8 @@ def create_fraudulent_receipt(fraud_scenario, receipt_id):
     # Generate content based on fraud type
     vendor = generate_fraudulent_vendor_name(config["vendor_type"])
     items = generate_fraudulent_items(config["items_type"])
-    receipt_date = generate_suspicious_date()
-    payment_method = generate_payment_method_fraud()
+    receipt_date = generate_suspicious_date(config.get("date_type", "normal"))
+    payment_method = generate_payment_method_fraud(config.get("payment_type", "normal"))
     
     # Calculate totals with fraud
     total_result = calculate_fraudulent_total(items, config["total_type"])
@@ -373,7 +557,18 @@ def generate_fraudulent_receipts():
         "round_numbers",
         "excessive_tip",
         "poor_quality",
-        "editing_artifacts"
+        "editing_artifacts",
+        "future_date",
+        "very_old_date",
+        "missing_payment",
+        "suspicious_payment",
+        "late_night_high_amount",
+        "month_end_fraud",
+        "generic_vendor",
+        "all_caps_vendor",
+        "tax_rate_anomaly",
+        "zero_amount",
+        "extreme_values"
     ]
     
     receipt_data = []
