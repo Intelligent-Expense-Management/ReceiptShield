@@ -29,6 +29,8 @@ export function SidebarLayout({ children, className, userRole = "employee" }: Si
         onToggle={toggleCollapse}
         className={isMobileOpen ? "translate-x-0" : ""}
         userRole={userRole}
+        isMobileOpen={isMobileOpen}
+        onMobileClose={() => setIsMobileOpen(false)}
       />
 
       {/* Main Content */}

@@ -39,16 +39,22 @@ interface ModernSidebarProps {
   onToggle?: () => void;
   className?: string;
   userRole?: string;
+  isMobileOpen?: boolean;
+  onMobileClose?: () => void;
 }
 
 export function ModernSidebar({ 
   isCollapsed = false, 
   onToggle,
   className,
-  userRole = "employee"
+  userRole = "employee",
+  isMobileOpen: externalIsMobileOpen,
+  onMobileClose
 }: ModernSidebarProps) {
   const pathname = usePathname();
-  const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [internalIsMobileOpen, setInternalIsMobileOpen] = useState(false);
+  const isMobileOpen = externalIsMobileOpen !== undefined ? externalIsMobileOpen : internalIsMobileOpen;
+  const setIsMobileOpen = onMobileClose ? () => onMobileClose() : setInternalIsMobileOpen;
   const [isChatbotOpen, setIsChatbotOpen] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('system');
   const { user, logout } = useAuth();
@@ -315,9 +321,9 @@ export function ModernSidebar({
         isMobileOpen ? "translate-x-0" : "-translate-x-full",
         isCollapsed ? "w-16" : "w-60",
         className
-      )}>
+      )} style={{ zIndex: 50 }}>
         {/* Header */}
-        <div className="flex items-center justify-between h-16 px-4 border-b border-[var(--color-border)]">
+        <div className="flex items-center justify-between h-16 px-4 border-b border-[var(--color-border)] relative" style={{ zIndex: 9999 }}>
           {!isCollapsed && (
             <div className="flex items-center space-x-2">
               <div className="p-2 bg-[var(--color-primary)]/10 rounded-lg">
@@ -337,10 +343,26 @@ export function ModernSidebar({
 
           {/* Mobile close button */}
           <button
-            onClick={() => setIsMobileOpen(false)}
-            className="lg:hidden p-2 rounded-md text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg)]"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setIsMobileOpen(false);
+            }}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setIsMobileOpen(false);
+            }}
+            onTouchStart={(e) => {
+              e.stopPropagation();
+              setIsMobileOpen(false);
+            }}
+            className="lg:hidden p-3 rounded-md text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg)] active:bg-[var(--color-bg)] relative z-[9999] pointer-events-auto cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center"
+            style={{ zIndex: 9999, position: 'relative' }}
+            type="button"
+            aria-label="Close menu"
           >
-            <X className="h-5 w-5" />
+            <X className="h-6 w-6" />
           </button>
         </div>
 
