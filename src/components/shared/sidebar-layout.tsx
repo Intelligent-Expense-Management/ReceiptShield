@@ -36,7 +36,7 @@ export function SidebarLayout({ children, className, userRole = "employee" }: Si
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Top Navigation */}
-        <header className="bg-[var(--color-card)] border-b border-[var(--color-border)] px-4 py-3 flex items-center justify-between">
+        <header className="bg-[var(--color-card)] border-b border-[var(--color-border)] px-4 py-3 flex items-center justify-between" style={{ paddingTop: 'max(calc(0.75rem + env(safe-area-inset-top)), 0.75rem)' }}>
           <div className="flex items-center space-x-4">
             <MobileMenuButton onClick={toggleMobile} />
             <h1 className="text-lg font-semibold text-[var(--color-text)]">

@@ -46,7 +46,7 @@ export function DashboardLayout({
         {/* Main Content */}
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Custom Header */}
-          <header className="bg-card/95 backdrop-blur-sm border-b border-border sticky top-0 z-40 shadow-sm">
+          <header className="bg-card/95 backdrop-blur-sm border-b border-border sticky top-0 z-40 shadow-sm" style={{ paddingTop: 'max(env(safe-area-inset-top), 0px)' }}>
             <div className="container mx-auto px-4 sm:px-6 md:px-8 h-16 flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <Link href={user?.role === 'manager' ? '/manager/dashboard' : '/employee/dashboard'} className="flex items-center gap-2 text-xl font-semibold text-foreground">
@@ -76,7 +76,7 @@ export function DashboardLayout({
       {/* Mobile Layout */}
       <div className="lg:hidden flex flex-col h-screen">
         {/* Mobile Header */}
-        <header className="bg-card/95 backdrop-blur-sm border-b border-border sticky top-0 z-40 shadow-sm">
+        <header className="bg-card/95 backdrop-blur-sm border-b border-border sticky top-0 z-40 shadow-sm" style={{ paddingTop: 'max(env(safe-area-inset-top), 0px)' }}>
           <div className="container mx-auto px-4 h-16 flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Button

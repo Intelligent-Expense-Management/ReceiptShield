@@ -44,7 +44,7 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-white">
       {/* Top Navbar */}
-      <nav className="fixed top-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-sm border-b border-gray-100">
+      <nav className="fixed top-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-sm border-b border-gray-100" style={{ paddingTop: 'max(env(safe-area-inset-top), 0px)' }}>
         <div className="px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
@@ -109,7 +109,7 @@ export default function HomePage() {
       </nav>
 
         {/* Hero Section */}
-        <section className="pt-24 pb-16 px-4 sm:px-6 lg:px-8">
+        <section className="pb-16 px-4 sm:px-6 lg:px-8" style={{ paddingTop: 'calc(6rem + max(env(safe-area-inset-top), 0px)))' }}>
         <div className="max-w-7xl mx-auto">
           <div className="text-center">
             <Badge className="mb-6 bg-green-50 text-green-700 border-green-200">
