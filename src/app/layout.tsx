@@ -14,6 +14,7 @@ export default function RootLayout({
       <head>
         <title>Receipt Shield</title>
         <meta name="description" content="Secure and user-friendly expense management." />
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
