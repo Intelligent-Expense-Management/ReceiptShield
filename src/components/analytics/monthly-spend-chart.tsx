@@ -88,9 +88,34 @@ export function MonthlySpendChart({ data, className }: MonthlySpendChartProps) {
 }
 
 function formatMonth(monthString: string): string {
-  const [year, month] = monthString.split('-');
-  const date = new Date(parseInt(year), parseInt(month) - 1);
-  return date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+  try {
+    // Handle "YYYY-MM" format
+    if (monthString.includes('-')) {
+      const [year, month] = monthString.split('-');
+      const yearNum = parseInt(year, 10);
+      const monthNum = parseInt(month, 10);
+      
+      // Validate the parsed values
+      if (isNaN(yearNum) || isNaN(monthNum) || monthNum < 1 || monthNum > 12) {
+        return monthString; // Return original if invalid
+      }
+      
+      const date = new Date(yearNum, monthNum - 1, 1);
+      
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        return monthString;
+      }
+      
+      return date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+    }
+    
+    // If format is unexpected, try to return as-is or parse differently
+    return monthString;
+  } catch (error) {
+    console.error('Error formatting month:', error, monthString);
+    return monthString; // Return original string on error
+  }
 }
 
 function calculateTrend(data: { month: string; amount: number }[]): number {

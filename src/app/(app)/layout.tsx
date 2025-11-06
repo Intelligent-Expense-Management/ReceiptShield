@@ -117,7 +117,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   }
 
   return (
-    <SidebarLayout userRole={user?.role}>
+    <SidebarLayout userRole={user?.role} user={user}>
       {/* Show read-only banner if subscription is expired */}
       {subscriptionStatus?.isExpired && pathname !== '/settings/subscription' && (
         <div className="container mx-auto p-4">

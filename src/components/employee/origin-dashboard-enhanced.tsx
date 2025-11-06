@@ -42,8 +42,13 @@ export function OriginDashboardEnhanced({ user }: OriginDashboardEnhancedProps) 
   const summaryData = analytics ? {
     totalReceipts: analytics.totalReceipts,
     totalAmount: analytics.totalSpent,
-    pendingAmount: analytics.statusBreakdown.find(s => s.status === 'Pending')?.amount || 0,
-    approvedAmount: analytics.statusBreakdown.find(s => s.status === 'Approved')?.amount || 0
+    // Look for "Pending Approval" or "Pending" status
+    pendingAmount: analytics.statusBreakdown.find(s => 
+      s.status === 'Pending Approval' || s.status === 'Pending'
+    )?.amount || 0,
+    approvedAmount: analytics.statusBreakdown.find(s => 
+      s.status === 'Approved' || s.status === 'approved'
+    )?.amount || 0
   } : {
     totalReceipts: 0,
     totalAmount: 0,
@@ -51,19 +56,36 @@ export function OriginDashboardEnhanced({ user }: OriginDashboardEnhancedProps) 
     approvedAmount: 0
   };
 
+  // Helper function to format status
+  const formatStatus = (status: string | undefined): string => {
+    if (!status) return 'Pending';
+    // Format status: "pending_approval" -> "Pending Approval", "approved" -> "Approved"
+    return status
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  };
+
   // Use real recent receipts if available
   const recentReceipts = analytics?.recentReceipts.slice(0, 3).map(receipt => {
-    const amount = receipt.items.reduce((sum, item) => {
-      const priceMatch = item.value.match(/\$?(\d+\.?\d*)/);
-      return sum + (priceMatch ? parseFloat(priceMatch[1]) : 0);
-    }, 0);
+    // Find the "Total Amount" field, not sum all items
+    const amountItem = receipt.items?.find(i => 
+      i.label.toLowerCase().includes('total amount') || 
+      i.label.toLowerCase().includes('amount') ||
+      (i.label.toLowerCase().includes('total') && !i.label.toLowerCase().includes('tax'))
+    );
+    const amount = amountItem ? parseFloat(amountItem.value.replace(/[^0-9.-]+/g, "") || "0") : 0;
+    
+    // Find vendor name
+    const vendorItem = receipt.items?.find(i => i.label.toLowerCase().includes('vendor'));
+    const vendor = vendorItem?.value || receipt.items[0]?.label || 'Unknown';
     
     return {
       id: receipt.id,
-      amount,
-      vendor: receipt.items[0]?.label || 'Unknown',
+      amount: isNaN(amount) ? 0 : amount,
+      vendor,
       date: new Date(receipt.uploadedAt).toLocaleDateString(),
-      status: receipt.status || 'pending'
+      status: formatStatus(receipt.status)
     };
   }) || [];
 
@@ -94,7 +116,7 @@ export function OriginDashboardEnhanced({ user }: OriginDashboardEnhancedProps) 
   }
 
   return (
-    <div className="space-y-6 bg-[var(--color-bg)] text-[var(--color-text)]">
+    <div className="space-y-6 bg-[var(--color-bg)] text-[var(--color-text)] px-4 sm:px-6 lg:px-8">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -168,7 +190,7 @@ export function OriginDashboardEnhanced({ user }: OriginDashboardEnhancedProps) 
               <Button
                 key={index}
                 variant="outline"
-                className="h-auto p-4 flex flex-col items-center space-y-2 hover:bg-[var(--color-bg-secondary)] border-[var(--color-border)]"
+                className="h-auto p-4 flex flex-col items-center space-y-2 border-[var(--color-border)] transition-colors hover:bg-green-600 hover:text-white"
                 asChild={!!action.href}
                 onClick={action.onClick}
               >
