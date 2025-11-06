@@ -2,14 +2,16 @@
 
 import { useState } from "react";
 import { ModernSidebar, MobileMenuButton } from "./modern-sidebar";
+import type { User } from "@/types";
 
 interface SidebarLayoutProps {
   children: React.ReactNode;
   className?: string;
   userRole?: string;
+  user?: User | null;
 }
 
-export function SidebarLayout({ children, className, userRole = "employee" }: SidebarLayoutProps) {
+export function SidebarLayout({ children, className, userRole = "employee", user }: SidebarLayoutProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
@@ -72,11 +74,13 @@ export function SidebarLayout({ children, className, userRole = "employee" }: Si
             {/* User Menu */}
             <div className="flex items-center space-x-3">
               <div className="text-right">
-                <p className="text-sm font-medium text-[var(--color-text)]">John Doe</p>
-                <p className="text-xs text-[var(--color-text-secondary)]">Manager</p>
+                <p className="text-sm font-medium text-[var(--color-text)]">{user?.name || 'User'}</p>
+                <p className="text-xs text-[var(--color-text-secondary)] capitalize">{user?.role || userRole || 'employee'}</p>
               </div>
               <div className="h-8 w-8 bg-primary/20 rounded-full flex items-center justify-center">
-                <span className="text-sm font-medium text-primary">JD</span>
+                <span className="text-sm font-medium text-primary">
+                  {user?.name ? user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : 'U'}
+                </span>
               </div>
             </div>
           </div>

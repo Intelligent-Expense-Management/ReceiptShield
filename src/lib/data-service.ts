@@ -181,16 +181,25 @@ export interface SpendingAnalytics {
   userVsAverage: { userSpent: number; averageSpent: number; period: string };
 }
 
+// Helper function to extract total amount from receipt items (same logic as receipts page)
+function getReceiptTotalAmount(receipt: ProcessedReceipt): number {
+  const amountItem = receipt.items?.find(i => 
+    i.label.toLowerCase().includes('total amount') || 
+    i.label.toLowerCase().includes('amount') ||
+    (i.label.toLowerCase().includes('total') && !i.label.toLowerCase().includes('tax'))
+  );
+  if (!amountItem) return 0;
+  const amountValue = parseFloat(amountItem.value.replace(/[^0-9.-]+/g, "") || "0");
+  return isNaN(amountValue) ? 0 : amountValue;
+}
+
 export async function getUserSpendingAnalytics(userEmail: string): Promise<SpendingAnalytics> {
   try {
     const receipts = await getUserReceipts(userEmail);
     
-    // Calculate total spent from items
+    // Calculate total spent - only use the "Total Amount" field, not sum all items
     const totalSpent = receipts.reduce((sum, receipt) => {
-      return sum + receipt.items.reduce((itemSum, item) => {
-        const priceMatch = item.value.match(/\$?(\d+\.?\d*)/);
-        return itemSum + (priceMatch ? parseFloat(priceMatch[1]) : 0);
-      }, 0);
+      return sum + getReceiptTotalAmount(receipt);
     }, 0);
     
     // Enhanced category breakdown using receipt category or merchant
@@ -208,10 +217,8 @@ export async function getUserSpendingAnalytics(userEmail: string): Promise<Spend
         }
       }
       
-      const amount = receipt.items.reduce((sum, item) => {
-        const priceMatch = item.value.match(/\$?(\d+\.?\d*)/);
-        return sum + (priceMatch ? parseFloat(priceMatch[1]) : 0);
-      }, 0);
+      // Use the total amount field, not sum of all items
+      const amount = getReceiptTotalAmount(receipt);
       
       spendingByCategory[category] = (spendingByCategory[category] || 0) + amount;
       
@@ -232,11 +239,19 @@ export async function getUserSpendingAnalytics(userEmail: string): Promise<Spend
     })).sort((a, b) => b.amount - a.amount);
     
     // Convert status breakdown to array
-    const statusBreakdownArray = Object.entries(statusBreakdown).map(([status, data]) => ({
-      status: status.charAt(0).toUpperCase() + status.slice(1),
-      count: data.count,
-      amount: data.amount
-    }));
+    const statusBreakdownArray = Object.entries(statusBreakdown).map(([status, data]) => {
+      // Format status: "pending_approval" -> "Pending Approval", "approved" -> "Approved"
+      const formattedStatus = status
+        .split('_')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+      
+      return {
+        status: formattedStatus,
+        count: data.count,
+        amount: data.amount
+      };
+    });
     
     // Generate monthly trends (last 6 months)
     const monthlyTrends = generateMonthlyTrends(receipts);
@@ -275,22 +290,17 @@ export async function getTeamSpendingAnalytics(teamEmails: string[]): Promise<Sp
   try {
     const receipts = await getTeamReceipts(teamEmails);
     
+    // Calculate total spent - only use the "Total Amount" field, not sum all items
     const totalSpent = receipts.reduce((sum, receipt) => {
-      return sum + receipt.items.reduce((itemSum, item) => {
-        // Extract price from item value if it contains a price
-        const priceMatch = item.value.match(/\$?(\d+\.?\d*)/);
-        return itemSum + (priceMatch ? parseFloat(priceMatch[1]) : 0);
-      }, 0);
+      return sum + getReceiptTotalAmount(receipt);
     }, 0);
     
     const spendingByCategory: { [category: string]: number } = {};
     receipts.forEach(receipt => {
-      receipt.items.forEach(item => {
-        const category = 'Other'; // Default category since ReceiptDataItem doesn't have category
-        const priceMatch = item.value.match(/\$?(\d+\.?\d*)/);
-        const price = priceMatch ? parseFloat(priceMatch[1]) : 0;
-        spendingByCategory[category] = (spendingByCategory[category] || 0) + price;
-      });
+      // Use the total amount field, not sum of all items
+      const amount = getReceiptTotalAmount(receipt);
+      const category = 'Other'; // Default category since ReceiptDataItem doesn't have category
+      spendingByCategory[category] = (spendingByCategory[category] || 0) + amount;
     });
     
     const monthlyTrends = generateMonthlyTrends(receipts);
@@ -326,22 +336,17 @@ export async function getOrganizationAnalytics(): Promise<SpendingAnalytics> {
   try {
     const receipts = await getAllReceipts();
     
+    // Calculate total spent - only use the "Total Amount" field, not sum all items
     const totalSpent = receipts.reduce((sum, receipt) => {
-      return sum + receipt.items.reduce((itemSum, item) => {
-        // Extract price from item value if it contains a price
-        const priceMatch = item.value.match(/\$?(\d+\.?\d*)/);
-        return itemSum + (priceMatch ? parseFloat(priceMatch[1]) : 0);
-      }, 0);
+      return sum + getReceiptTotalAmount(receipt);
     }, 0);
     
     const spendingByCategory: { [category: string]: number } = {};
     receipts.forEach(receipt => {
-      receipt.items.forEach(item => {
-        const category = 'Other'; // Default category since ReceiptDataItem doesn't have category
-        const priceMatch = item.value.match(/\$?(\d+\.?\d*)/);
-        const price = priceMatch ? parseFloat(priceMatch[1]) : 0;
-        spendingByCategory[category] = (spendingByCategory[category] || 0) + price;
-      });
+      // Use the total amount field, not sum of all items
+      const amount = getReceiptTotalAmount(receipt);
+      const category = 'Other'; // Default category since ReceiptDataItem doesn't have category
+      spendingByCategory[category] = (spendingByCategory[category] || 0) + amount;
     });
     
     const monthlyTrends = generateMonthlyTrends(receipts);
@@ -757,10 +762,8 @@ function generateMonthlyTrends(receipts: ProcessedReceipt[]): { month: string; a
     const date = new Date(receipt.uploadedAt);
     const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
     
-    const receiptTotal = receipt.items.reduce((sum, item) => {
-      const priceMatch = item.value.match(/\$?(\d+\.?\d*)/);
-      return sum + (priceMatch ? parseFloat(priceMatch[1]) : 0);
-    }, 0);
+    // Use the total amount field, not sum of all items
+    const receiptTotal = getReceiptTotalAmount(receipt);
     monthlyData[monthKey] = (monthlyData[monthKey] || 0) + receiptTotal;
   });
   
@@ -770,10 +773,9 @@ function generateMonthlyTrends(receipts: ProcessedReceipt[]): { month: string; a
   for (let i = 5; i >= 0; i--) {
     const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
     const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-    const monthName = date.toLocaleDateString('en-US', { month: 'short' });
     
     trends.push({
-      month: monthName,
+      month: monthKey, // Return in "YYYY-MM" format for proper date formatting
       amount: monthlyData[monthKey] || 0
     });
   }

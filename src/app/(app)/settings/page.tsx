@@ -8,13 +8,15 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Settings, User, Bell, Shield, Palette, Database, LogOut } from "lucide-react";
+import { useAuth } from "@/contexts/auth-context";
 
 export default function SettingsPage() {
+  const { user } = useAuth();
   const [settings, setSettings] = useState({
     profile: {
-      name: "John Doe",
-      email: "john.doe@company.com",
-      role: "Employee",
+      name: user?.name || "",
+      email: user?.email || "",
+      role: user?.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : "Employee",
       department: "Engineering"
     },
     notifications: {
@@ -39,6 +41,21 @@ export default function SettingsPage() {
       passwordExpiry: 90
     }
   });
+
+  // Update settings when user data is available
+  useEffect(() => {
+    if (user) {
+      setSettings(prev => ({
+        ...prev,
+        profile: {
+          name: user.name || prev.profile.name,
+          email: user.email || prev.profile.email,
+          role: user.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : prev.profile.role,
+          department: prev.profile.department
+        }
+      }));
+    }
+  }, [user]);
 
   const handleSettingChange = (category: string, key: string, value: any) => {
     setSettings(prev => ({
