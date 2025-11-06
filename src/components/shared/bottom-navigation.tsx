@@ -110,7 +110,14 @@ export function BottomNavigation({ userRole }: BottomNavigationProps) {
   );
 
   return (
-    <nav className="bottom-nav md:hidden">
+    <nav className="bottom-nav md:hidden" style={{ 
+      position: 'fixed',
+      bottom: 0,
+      left: 0,
+      right: 0,
+      zIndex: 50,
+      paddingBottom: 'env(safe-area-inset-bottom, 0)'
+    }}>
       <div className="flex h-16 items-center justify-around px-4">
         {visibleItems.map((item) => {
           const isActive = pathname === item.href || pathname.startsWith(item.href);

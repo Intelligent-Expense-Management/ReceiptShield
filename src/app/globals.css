@@ -393,8 +393,10 @@
 
   /* Origin-Style Navigation */
   .bottom-nav {
-    @apply fixed bottom-0 left-0 right-0 bg-card border-t border-border;
+    @apply fixed bottom-0 left-0 right-0 bg-card border-t border-border z-50;
     backdrop-filter: blur(10px);
+    /* Support for mobile safe areas (iPhone home indicator, etc.) */
+    padding-bottom: env(safe-area-inset-bottom, 0);
   }
 
   .nav-item {
