@@ -9,7 +9,7 @@ export default function EmployeeDashboardPage() {
 
   return (
     <NoSSR>
-      <OriginDashboardEnhanced user={user} />
+      <OriginDashboardEnhanced user={user ?? undefined} />
     </NoSSR>
   );
 }
