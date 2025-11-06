@@ -87,7 +87,7 @@ export function SidebarLayout({ children, className, userRole = "employee", user
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 overflow-auto bg-[var(--color-bg)]">
+        <main className="flex-1 overflow-auto bg-[var(--color-bg)] pb-20 md:pb-0">
           <div className={className}>
             {children}
           </div>
