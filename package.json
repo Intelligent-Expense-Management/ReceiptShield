@@ -22,6 +22,9 @@
     "build:analyze": "cross-env ANALYZE=true npm run build"
   },
   "dependencies": {
+    "@capacitor/cli": "^7.4.4",
+    "@capacitor/core": "^7.4.4",
+    "@capacitor/ios": "^7.4.4",
     "@fastify/busboy": "^3.2.0",
     "@genkit-ai/googleai": "^1.8.0",
     "@genkit-ai/next": "^1.8.0",
