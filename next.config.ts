@@ -2,6 +2,9 @@ import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
   /* config options here */
+  // Note: 'output: export' is disabled because API routes cannot be statically exported
+  // For Capacitor, API calls should point to a server URL configured in capacitor.config.ts
+  // output: 'export',
   typescript: {
     ignoreBuildErrors: true,
   },
