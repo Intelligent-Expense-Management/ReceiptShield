@@ -3,6 +3,7 @@
 <!-- Platform Admin Dashboard Plan - Created: 2024 -->
 
 ## Overview
+
 Create a dedicated dashboard for platform administrators (`isPlatformAdmin: true`) to oversee all companies, users, and system-wide analytics across the entire ReceiptShield platform.
 
 ---
@@ -10,6 +11,7 @@ Create a dedicated dashboard for platform administrators (`isPlatformAdmin: true
 ## Architecture
 
 ### 1. Route Structure
+
 - **Route**: `/platform/dashboard` - Main platform admin dashboard (new route)
 - **Routing Logic**: If `user.isPlatformAdmin === true`, redirect to `/platform/dashboard` instead of `/admin/dashboard`
 - **Access Control**: Restricted to users with `isPlatformAdmin === true`
@@ -17,6 +19,7 @@ Create a dedicated dashboard for platform administrators (`isPlatformAdmin: true
 ### 2. Dashboard Sections
 
 #### A. Platform Overview Cards (Top Stats)
+
 - **Total Companies** - Count of all companies in the system
 - **Active Subscriptions** - Companies with active/trialing subscriptions
 - **Total Users** - All users across all companies
@@ -25,6 +28,7 @@ Create a dedicated dashboard for platform administrators (`isPlatformAdmin: true
 - **Trials Expiring Soon** - Companies with trials expiring in next 7 days
 
 #### B. Companies Management Table
+
 - **Company List** with columns:
   - Company name
   - Owner name/email
@@ -41,6 +45,7 @@ Create a dedicated dashboard for platform administrators (`isPlatformAdmin: true
     - View Company Dashboard (optional)
 
 #### C. Subscription Analytics
+
 - **Subscription Distribution Chart** - Pie/bar chart showing trial/basic/pro/enterprise distribution
 - **Revenue Metrics**:
   - MRR (Monthly Recurring Revenue)
@@ -52,6 +57,7 @@ Create a dedicated dashboard for platform administrators (`isPlatformAdmin: true
 - **Churn Rate** - Companies that canceled subscriptions
 
 #### D. Platform Users Overview
+
 - **Total Users** across all companies
 - **Users by Role** distribution chart
 - **Active vs Inactive** users breakdown
@@ -59,6 +65,7 @@ Create a dedicated dashboard for platform administrators (`isPlatformAdmin: true
 - **Users by Company** - List showing user distribution
 
 #### E. System Health Metrics
+
 - **Receipt Processing Stats**:
   - Total receipts processed
   - Average processing time
@@ -78,11 +85,13 @@ Create a dedicated dashboard for platform administrators (`isPlatformAdmin: true
 ### New Components:
 
 1. **`PlatformOverviewCards.tsx`**
+
    - Platform-wide statistics cards
    - Location: `src/components/platform/`
    - Displays: Total companies, active subscriptions, total users, total receipts, MRR, trials expiring
 
 2. **`CompaniesManagementTable.tsx`**
+
    - Full companies table with sorting, filtering, and actions
    - Location: `src/components/platform/`
    - Features:
@@ -92,6 +101,7 @@ Create a dedicated dashboard for platform administrators (`isPlatformAdmin: true
      - Actions menu per company
 
 3. **`PlatformSubscriptionAnalytics.tsx`**
+
    - Charts and visualizations for subscription metrics
    - Location: `src/components/platform/`
    - Charts:
@@ -101,11 +111,13 @@ Create a dedicated dashboard for platform administrators (`isPlatformAdmin: true
      - Churn analysis
 
 4. **`PlatformUsersOverview.tsx`**
+
    - Users statistics across platform
    - Location: `src/components/platform/`
    - Shows: Role distribution, active/inactive breakdown, signup trends
 
 5. **`CompanyDetailsDialog.tsx`**
+
    - Modal to view/edit company details
    - Location: `src/components/platform/`
    - Features:
@@ -117,6 +129,7 @@ Create a dedicated dashboard for platform administrators (`isPlatformAdmin: true
      - Action buttons (edit, manage subscription)
 
 6. **`PlatformReceiptsAnalytics.tsx`**
+
    - Platform-wide receipt analytics
    - Location: `src/components/platform/`
    - Shows: Receipt processing stats, fraud rates, trends
@@ -124,10 +137,12 @@ Create a dedicated dashboard for platform administrators (`isPlatformAdmin: true
 ### Modified Components:
 
 1. **Routing Logic** (`src/app/(app)/layout.tsx` or `src/contexts/auth-context.tsx`)
+
    - Check if user is platform admin on login
    - Redirect to `/platform/dashboard` instead of `/admin/dashboard`
 
 2. **Navigation** (`src/components/shared/modern-sidebar.tsx`)
+
    - Add "Platform Admin" section for platform admins
    - Show platform admin badge/indicator
 
@@ -185,6 +200,7 @@ Create a dedicated dashboard for platform administrators (`isPlatformAdmin: true
    }>>
    ```
 
+
 ### Enhanced Existing Functions:
 
 - Use `getAllCompanies()` - already exists
@@ -198,6 +214,7 @@ Create a dedicated dashboard for platform administrators (`isPlatformAdmin: true
 ### Company Management:
 
 1. **View Company Details**
+
    - Company information (name, owner, dates)
    - Subscription details (tier, status, dates)
    - User list for that company
@@ -205,16 +222,19 @@ Create a dedicated dashboard for platform administrators (`isPlatformAdmin: true
    - Usage analytics
 
 2. **Activate/Deactivate Companies**
+
    - Toggle company status
    - Suspend access if needed
    - Reactivate suspended companies
 
 3. **View Subscription History**
+
    - Track subscription changes over time
    - See tier upgrades/downgrades
    - Payment history
 
 4. **Manual Subscription Adjustments** (Optional - for support)
+
    - Change subscription tier
    - Extend trial period
    - Apply discounts/credits
@@ -222,12 +242,14 @@ Create a dedicated dashboard for platform administrators (`isPlatformAdmin: true
 ### User Management:
 
 1. **View All Users**
+
    - List all users across all companies
    - Filter by company
    - Search by name/email
    - View user details and activity
 
 2. **User Activity Tracking**
+
    - Recent activity per user
    - Login history
    - Receipt submission stats
@@ -235,24 +257,28 @@ Create a dedicated dashboard for platform administrators (`isPlatformAdmin: true
 ### Analytics:
 
 1. **Platform-wide Receipt Analytics**
+
    - Total receipts processed
    - Receipts by company
    - Fraud detection rates
    - Processing trends
 
 2. **Revenue Reporting**
+
    - MRR breakdown
    - ARR calculation
    - Revenue by tier
    - Payment success/failure rates
 
 3. **Growth Metrics**
+
    - New company signups over time
    - User growth trends
    - Subscription growth
    - Trial conversion rates
 
 4. **Trial Conversion Tracking**
+
    - Trial → Paid conversion rate
    - Conversion by tier
    - Common upgrade paths
@@ -262,22 +288,26 @@ Create a dedicated dashboard for platform administrators (`isPlatformAdmin: true
 ## Implementation Order
 
 ### Phase 1: Foundation
+
 1. ✅ Create `/platform/dashboard` route
 2. ✅ Update routing logic to redirect platform admins
 3. ✅ Create `PlatformOverviewCards` component
 4. ✅ Add platform stats fetching functions
 
 ### Phase 2: Core Features
+
 5. ✅ Create `CompaniesManagementTable` component
 6. ✅ Create `CompanyDetailsDialog` component
 7. ✅ Add company management functions
 
 ### Phase 3: Analytics
+
 8. ✅ Create `PlatformSubscriptionAnalytics` component
 9. ✅ Create `PlatformUsersOverview` component
 10. ✅ Create `PlatformReceiptsAnalytics` component
 
 ### Phase 4: Navigation & Polish
+
 11. ✅ Update navigation for platform admins
 12. ✅ Add platform admin badges/indicators
 13. ✅ Polish UI/UX
@@ -287,11 +317,13 @@ Create a dedicated dashboard for platform administrators (`isPlatformAdmin: true
 ## Security & Permissions
 
 ### Access Control:
+
 - **Route Protection**: Only users with `isPlatformAdmin === true` can access `/platform/dashboard`
 - **Firestore Rules**: Platform admins can read all companies, users, and receipts
 - **Action Logging**: All platform admin actions should be logged for audit trail
 
 ### Permissions Matrix:
+
 - **Platform Admin**: Full access to all companies, can manage subscriptions, activate/deactivate companies
 - **Company Admin**: Access only to their own company data (existing behavior)
 - **Regular Users**: Access only to their assigned company (existing behavior)
@@ -301,6 +333,7 @@ Create a dedicated dashboard for platform administrators (`isPlatformAdmin: true
 ## UI/UX Considerations
 
 ### Design:
+
 - **Clear Distinction**: Platform dashboard should look different from regular admin dashboard
 - **"Platform Admin" Badge**: Visible indicator throughout the interface
 - **Company Selector**: Optional filter dropdown to view specific company data
@@ -309,6 +342,7 @@ Create a dedicated dashboard for platform administrators (`isPlatformAdmin: true
 - **Responsive Design**: Works on mobile/tablet
 
 ### User Experience:
+
 - **Intuitive Navigation**: Easy access to all platform-wide features
 - **Quick Actions**: Fast access to common tasks
 - **Data Visualization**: Charts and graphs for easy understanding
@@ -319,6 +353,7 @@ Create a dedicated dashboard for platform administrators (`isPlatformAdmin: true
 ## Technical Implementation Details
 
 ### Routing Changes:
+
 ```typescript
 // In auth-context.tsx or layout.tsx
 if (user.isPlatformAdmin) {
@@ -329,6 +364,7 @@ if (user.isPlatformAdmin) {
 ```
 
 ### Component Structure:
+
 ```
 src/
   app/
@@ -347,6 +383,7 @@ src/
 ```
 
 ### Data Flow:
+
 1. Platform admin logs in → Check `isPlatformAdmin` flag
 2. Redirect to `/platform/dashboard`
 3. Fetch platform-wide stats on page load
@@ -359,9 +396,11 @@ src/
 ## Questions & Decisions Needed
 
 1. **Routing**: Should platform admins be redirected to `/platform/dashboard` instead of `/admin/dashboard`, or have access to both?
+
    - **Recommendation**: Redirect to `/platform/dashboard` for clarity
 
 2. **Company Management Actions**: Which actions should be available?
+
    - ✅ View company details
    - ✅ Activate/deactivate companies
    - ❓ Manually change subscription tier (for support)
@@ -369,12 +408,14 @@ src/
    - ❓ View Stripe customer details
 
 3. **Analytics Depth**: How detailed should analytics be?
+
    - ✅ Basic platform stats
    - ✅ Subscription metrics
    - ❓ Per-company breakdowns?
    - ❓ Historical trends (last 6 months, year)?
 
 4. **Navigation**: How should platform admin menu be structured?
+
    - **Recommendation**: Add "Platform Admin" section at top of sidebar with:
      - Platform Dashboard
      - All Companies
@@ -399,11 +440,17 @@ src/
 ## Success Criteria
 
 ✅ Platform admins can view all companies and their status
+
 ✅ Platform admins can see platform-wide statistics
+
 ✅ Platform admins can manage company subscriptions
+
 ✅ Analytics show subscription trends and revenue
+
 ✅ User management works across all companies
+
 ✅ Security is properly enforced (only platform admins access)
+
 ✅ UI is intuitive and distinguishes platform admin features
 
 ---
@@ -414,4 +461,3 @@ src/
 2. Begin implementation with Phase 1 (Foundation)
 3. Test with platform admin user
 4. Iterate based on feedback
-

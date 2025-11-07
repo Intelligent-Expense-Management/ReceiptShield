@@ -94,15 +94,17 @@ service cloud.firestore {
       // For writes, check companyId if custom claims are available, otherwise allow if authenticated
       // Application code should validate companyId before writing
       allow write: if isAuthenticated() && (
+        isPlatformAdmin() ||
         !hasCompanyClaim() || // If no custom claims, allow (app validates)
-        resource.data.companyId == getUserCompanyId() || 
-        isPlatformAdmin()
+        resource.data.companyId == getUserCompanyId() ||
+        (resource.data.companyId == null || resource.data.companyId == '') // Allow empty/null for legacy users or when user doc hasn't synced with claims
       );
       
       allow create: if isAuthenticated() && (
-        !hasCompanyClaim() || // If no custom claims, allow (app validates)
-        request.resource.data.companyId == getUserCompanyId() || 
-        isPlatformAdmin()
+        isPlatformAdmin() ||
+        !hasCompanyClaim() || // If no custom claims, allow any companyId (app validates)
+        request.resource.data.companyId == getUserCompanyId() || // If has claim, must match
+        (request.resource.data.companyId == null || request.resource.data.companyId == '') // Allow empty/null for legacy users or when user doc hasn't synced with claims
       );
     }
 

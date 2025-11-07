@@ -63,6 +63,26 @@ export default function ReceiptDetailsPage() {
     loadReceipt();
   }, [receiptId]);
   
+  // Determine image source and check if it's a PDF (calculate before early returns)
+  const imageSource = receipt?.imageUrl || receipt?.imageDataUri;
+  const hasValidImageSource = imageSource && imageSource.trim() !== '';
+  const isPdf = hasValidImageSource && (imageSource.startsWith('data:application/pdf') || receipt?.fileName?.toLowerCase().endsWith('.pdf'));
+  
+  // Log image source for debugging (must be before early returns to maintain hook order)
+  useEffect(() => {
+    if (receipt) {
+      console.log('Image source debug:', {
+        hasImageUrl: !!receipt.imageUrl,
+        hasImageDataUri: !!receipt.imageDataUri,
+        imageUrl: receipt.imageUrl?.substring(0, 100),
+        imageDataUri: receipt.imageDataUri?.substring(0, 100),
+        imageSource,
+        hasValidImageSource,
+        isPdf
+      });
+    }
+  }, [receipt, imageSource, hasValidImageSource, isPdf]);
+  
   const handleBackToDashboard = () => {
     if (user?.role === 'manager') {
       router.push('/manager/dashboard');
@@ -112,26 +132,6 @@ export default function ReceiptDetailsPage() {
   }
 
   const fraudProbabilityPercent = Math.round(receipt.fraudProbability * 100);
-  
-  // Determine image source and check if it's a PDF
-  const imageSource = receipt.imageUrl || receipt.imageDataUri;
-  const hasValidImageSource = imageSource && imageSource.trim() !== '';
-  const isPdf = hasValidImageSource && (imageSource.startsWith('data:application/pdf') || receipt.fileName?.toLowerCase().endsWith('.pdf'));
-  
-  // Log image source for debugging
-  useEffect(() => {
-    if (receipt) {
-      console.log('Image source debug:', {
-        hasImageUrl: !!receipt.imageUrl,
-        hasImageDataUri: !!receipt.imageDataUri,
-        imageUrl: receipt.imageUrl?.substring(0, 100),
-        imageDataUri: receipt.imageDataUri?.substring(0, 100),
-        imageSource,
-        hasValidImageSource,
-        isPdf
-      });
-    }
-  }, [receipt, imageSource, hasValidImageSource, isPdf]);
 
   const getStatusBadge = () => {
     if (receipt.status === 'approved') {
