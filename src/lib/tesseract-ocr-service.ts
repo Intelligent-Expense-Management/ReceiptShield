@@ -9,6 +9,21 @@
 import Tesseract from 'tesseract.js';
 import { ReceiptDataItem } from '@/types';
 
+const isDebugLoggingEnabled = process.env.NODE_ENV !== 'production';
+
+const logDebug = (...args: unknown[]) => {
+  if (!isDebugLoggingEnabled) {
+    return;
+  }
+  // eslint-disable-next-line no-console
+  console.log(...args);
+};
+
+const logError = (...args: unknown[]) => {
+  // eslint-disable-next-line no-console
+  console.error(...args);
+};
+
 export interface TesseractOCRResult {
   text: string;
   confidence: number;
@@ -27,13 +42,13 @@ export async function extractTextWithTesseract(imageDataUri: string): Promise<Te
   const errorLog: string[] = [];
   
   try {
-    console.log('🔍 Starting Tesseract OCR analysis...');
+    logDebug('🔍 Starting Tesseract OCR analysis...');
     
     // Configure Tesseract worker
     const worker = await Tesseract.createWorker('eng', 1, {
       logger: (m) => {
         if (m.status === 'recognizing text') {
-          console.log(`📝 OCR Progress: ${Math.round(m.progress * 100)}%`);
+          logDebug(`📝 OCR Progress: ${Math.round(m.progress * 100)}%`);
         }
       }
     });
@@ -44,9 +59,9 @@ export async function extractTextWithTesseract(imageDataUri: string): Promise<Te
     // Terminate worker
     await worker.terminate();
     
-    console.log('✅ Tesseract OCR completed');
-    console.log('📊 OCR Confidence:', confidence);
-    console.log('📝 Extracted text length:', text.length);
+    logDebug('✅ Tesseract OCR completed');
+    logDebug('📊 OCR Confidence:', confidence);
+    logDebug('📝 Extracted text length:', text.length);
     
     // Parse the extracted text into structured data
     const items = parseReceiptText(text);
@@ -64,7 +79,7 @@ export async function extractTextWithTesseract(imageDataUri: string): Promise<Te
   } catch (error) {
     const errorMsg = `Tesseract OCR failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
     errorLog.push(errorMsg);
-    console.error(errorMsg, error);
+    logError(errorMsg, error);
     
     return {
       text: '',
@@ -88,8 +103,8 @@ function parseReceiptText(text: string): ReceiptDataItem[] {
     .map((line) => line.trim())
     .filter((line) => line.length > 0);
 
-  console.log('📋 Parsing receipt text into structured data...');
-  console.log('📄 Total lines to process:', normalizedLines.length);
+  logDebug('📋 Parsing receipt text into structured data...');
+  logDebug('📄 Total lines to process:', normalizedLines.length);
 
   const parsedItems: ReceiptDataItem[] = [];
   const seenSingleValueItems = new Set<string>();
@@ -198,10 +213,10 @@ function parseReceiptText(text: string): ReceiptDataItem[] {
       return;
     }
 
-    console.debug('ℹ️ Ignored line during parsing:', lineForLogging);
+    logDebug('ℹ️ Ignored line during parsing:', lineForLogging);
   });
 
-  console.log('✅ Parsed receipt items:', parsedItems.length);
+  logDebug('✅ Parsed receipt items:', parsedItems.length);
   return parsedItems;
 }
 
@@ -252,8 +267,8 @@ function isVendorLine(line: string): boolean {
  */
 function extractDate(line: string): string | null {
   const datePatterns = [
-    /(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})/,
-    /(\d{4}[\/.-]\d{1,2}[\/.-]\d{1,2})/,
+    /(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})/,
+    /(\d{4}[/.-]\d{1,2}[/.-]\d{1,2})/,
     /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)\.?[\s-]+\d{1,2},?\s+\d{2,4}\b/i,
     /\b(\d{1,2}\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)\s+\d{2,4})\b/i
   ];
