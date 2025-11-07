@@ -17,7 +17,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import { Eye, FileText, Loader2, Pencil, Trash2, ClipboardCheck, AlertTriangle, ShieldQuestion, CheckCircle, XCircle, Edit3, Send } from 'lucide-react';
+import { Eye, FileText, Loader2, Pencil, Trash2, ClipboardCheck, AlertTriangle, ShieldQuestion, CheckCircle, XCircle, Edit3, Send, MessageSquareText } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -327,11 +327,19 @@ export function SubmissionHistoryTable() {
               Are you ready to resubmit this receipt for manager review? <br />
               <strong>{receiptToResubmit?.fileName}</strong>
               {receiptToResubmit?.managerNotes && (
-                <>
-                  <br /><br />
-                  <strong>Manager's feedback:</strong><br />
-                  <em className="text-sm text-muted-foreground">{receiptToResubmit.managerNotes}</em>
-                </>
+                <div className="mt-4 p-4 bg-orange-50 dark:bg-orange-950/20 border-2 border-orange-500 rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <MessageSquareText className="w-5 h-5 text-orange-600 dark:text-orange-400 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <strong className="text-sm font-semibold text-orange-900 dark:text-orange-200 block mb-1">
+                        Manager's Feedback:
+                      </strong>
+                      <p className="text-sm text-orange-800 dark:text-orange-300 whitespace-pre-wrap leading-relaxed">
+                        {receiptToResubmit.managerNotes}
+                      </p>
+                    </div>
+                  </div>
+                </div>
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>

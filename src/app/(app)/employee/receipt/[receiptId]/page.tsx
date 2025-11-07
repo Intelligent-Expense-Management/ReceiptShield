@@ -43,7 +43,15 @@ export default function ReceiptDetailsPage() {
       if (receiptId) {
         try {
           const foundReceipt = await getReceiptById(receiptId);
-          console.log('Loaded receipt data:', foundReceipt);
+          console.log('Loaded receipt data:', {
+            id: foundReceipt?.id,
+            fileName: foundReceipt?.fileName,
+            hasImageUrl: !!foundReceipt?.imageUrl,
+            hasImageDataUri: !!foundReceipt?.imageDataUri,
+            imageUrl: foundReceipt?.imageUrl?.substring(0, 100),
+            imageDataUri: foundReceipt?.imageDataUri?.substring(0, 100),
+            fullReceipt: foundReceipt
+          });
           setReceipt(foundReceipt || null);
         } catch (error) {
           console.error('Error loading receipt:', error);
@@ -109,6 +117,21 @@ export default function ReceiptDetailsPage() {
   const imageSource = receipt.imageUrl || receipt.imageDataUri;
   const hasValidImageSource = imageSource && imageSource.trim() !== '';
   const isPdf = hasValidImageSource && (imageSource.startsWith('data:application/pdf') || receipt.fileName?.toLowerCase().endsWith('.pdf'));
+  
+  // Log image source for debugging
+  useEffect(() => {
+    if (receipt) {
+      console.log('Image source debug:', {
+        hasImageUrl: !!receipt.imageUrl,
+        hasImageDataUri: !!receipt.imageDataUri,
+        imageUrl: receipt.imageUrl?.substring(0, 100),
+        imageDataUri: receipt.imageDataUri?.substring(0, 100),
+        imageSource,
+        hasValidImageSource,
+        isPdf
+      });
+    }
+  }, [receipt, imageSource, hasValidImageSource, isPdf]);
 
   const getStatusBadge = () => {
     if (receipt.status === 'approved') {
@@ -157,14 +180,43 @@ export default function ReceiptDetailsPage() {
                 </div>
               ) : hasValidImageSource ? (
                 <div className="border rounded-lg overflow-hidden shadow-md relative bg-muted h-[calc(80vh-150px)] min-h-[400px]">
-                  <Image
-                    src={imageSource}
-                    alt={`Receipt ${receipt.fileName}`}
-                    fill
-                    style={{objectFit: 'contain'}}
-                    className="p-2"
-                    data-ai-hint="receipt full"
-                  />
+                  {imageSource.startsWith('http') ? (
+                    // For Firebase Storage URLs, use regular img tag
+                    <img
+                      src={imageSource}
+                      alt={`Receipt ${receipt.fileName}`}
+                      className="absolute inset-0 w-full h-full object-contain p-2"
+                      style={{position: 'absolute', top: 0, left: 0, right: 0, bottom: 0}}
+                      onError={(e) => {
+                        console.error('Image load error:', {
+                          src: imageSource,
+                          error: e
+                        });
+                        // Try to use proxy if Firebase Storage URL fails
+                        if (imageSource.includes('firebasestorage.googleapis.com')) {
+                          const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(imageSource)}`;
+                          e.currentTarget.src = proxyUrl;
+                        }
+                      }}
+                    />
+                  ) : (
+                    // For data URIs, use Next.js Image component
+                    <Image
+                      src={imageSource}
+                      alt={`Receipt ${receipt.fileName}`}
+                      fill
+                      style={{objectFit: 'contain'}}
+                      className="p-2"
+                      unoptimized={imageSource.startsWith('data:')}
+                      data-ai-hint="receipt full"
+                      onError={(e) => {
+                        console.error('Next.js Image load error:', {
+                          src: imageSource.substring(0, 100),
+                          error: e
+                        });
+                      }}
+                    />
+                  )}
                 </div>
               ) : (
                 <div className="border rounded-lg overflow-hidden shadow-md relative bg-muted h-[calc(80vh-150px)] min-h-[400px] flex items-center justify-center">
@@ -321,14 +373,49 @@ export default function ReceiptDetailsPage() {
                   </div>
                 )}
                 {receipt.managerNotes && (
-                  <Card className="mt-3 shadow-sm">
-                    <CardHeader className="p-3">
-                      <CardTitle className="text-md flex items-center gap-2"><MessageSquareText className="w-4 h-4 text-accent"/>Manager Notes</CardTitle>
+                  <Card className={`mt-3 shadow-sm ${
+                    (receipt.status === 'draft' || receipt.isDraft || receipt.status === 'rejected') 
+                      ? 'border-orange-500 border-2 bg-orange-50 dark:bg-orange-950/20' 
+                      : ''
+                  }`}>
+                    <CardHeader className="p-4">
+                      <CardTitle className={`text-lg flex items-center gap-2 ${
+                        (receipt.status === 'draft' || receipt.isDraft || receipt.status === 'rejected')
+                          ? 'text-orange-700 dark:text-orange-400'
+                          : ''
+                      }`}>
+                        <MessageSquareText className={`w-5 h-5 ${
+                          (receipt.status === 'draft' || receipt.isDraft || receipt.status === 'rejected')
+                            ? 'text-orange-600 dark:text-orange-400'
+                            : 'text-accent'
+                        }`}/>
+                        {(receipt.status === 'draft' || receipt.isDraft || receipt.status === 'rejected')
+                          ? 'Action Required: Manager Feedback'
+                          : 'Manager Notes'}
+                      </CardTitle>
                     </CardHeader>
-                    <CardContent className="p-3 pt-0">
-                      <ScrollArea className="h-28">
-                        <p className="text-xs whitespace-pre-wrap">{receipt.managerNotes}</p>
-                      </ScrollArea>
+                    <CardContent className="p-4 pt-0">
+                      <div className={`p-4 rounded-md ${
+                        (receipt.status === 'draft' || receipt.isDraft || receipt.status === 'rejected')
+                          ? 'bg-white dark:bg-orange-900/10 border border-orange-200 dark:border-orange-800'
+                          : 'bg-muted/50'
+                      }`}>
+                        <p className={`whitespace-pre-wrap leading-relaxed ${
+                          (receipt.status === 'draft' || receipt.isDraft || receipt.status === 'rejected')
+                            ? 'text-sm font-medium text-orange-900 dark:text-orange-200'
+                            : 'text-sm text-muted-foreground'
+                        }`}>
+                          {receipt.managerNotes}
+                        </p>
+                      </div>
+                      {(receipt.status === 'draft' || receipt.isDraft) && (
+                        <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-md">
+                          <p className="text-sm text-blue-800 dark:text-blue-300 flex items-center gap-2">
+                            <Info className="w-4 h-4" />
+                            <span>Please review the feedback above and make necessary corrections before resubmitting.</span>
+                          </p>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 )}

@@ -6,6 +6,7 @@ import {
   getDocs, 
   getDoc, 
   addDoc, 
+  setDoc,
   updateDoc, 
   query, 
   where,
@@ -211,7 +212,7 @@ export async function addUser(user: Omit<User, 'id' | 'createdAt' | 'updatedAt'>
 
     // Clean and validate the data
     const now = new Date();
-    const userData = {
+    const userData: any = {
       uid: user.uid || '', // Will be set when user is created via Firebase Auth
       name: user.name.trim(),
       email: user.email.toLowerCase().trim(),
@@ -222,16 +223,53 @@ export async function addUser(user: Omit<User, 'id' | 'createdAt' | 'updatedAt'>
       updatedAt: now,
     };
 
-    // Remove any undefined or null values that might cause issues
+    // Include company-related fields if provided
+    if (user.companyId !== undefined) {
+      userData.companyId = user.companyId;
+    }
+    if (user.isCompanyOwner !== undefined) {
+      userData.isCompanyOwner = user.isCompanyOwner;
+    }
+    if (user.canManageSubscription !== undefined) {
+      userData.canManageSubscription = user.canManageSubscription;
+    }
+    if (user.isPlatformAdmin !== undefined) {
+      userData.isPlatformAdmin = user.isPlatformAdmin;
+    }
+
+    // Remove any undefined or null values that might cause issues (but keep companyId even if null for filtering)
     const cleanUserData = Object.fromEntries(
-      Object.entries(userData).filter(([_, value]) => value !== undefined && value !== null)
+      Object.entries(userData).filter(([key, value]) => {
+        // Keep companyId even if null/undefined for proper filtering
+        if (key === 'companyId') return true;
+        return value !== undefined && value !== null;
+      })
     );
     
-    console.log('Adding user to Firestore...');
+    console.log('Adding user to Firestore with data:', {
+      name: cleanUserData.name,
+      email: cleanUserData.email,
+      role: cleanUserData.role,
+      companyId: cleanUserData.companyId,
+      status: cleanUserData.status,
+      uid: cleanUserData.uid,
+    });
     
-    const docRef = await addDoc(collection(db, USERS_COLLECTION), cleanUserData);
-    console.log('User added successfully with ID:', docRef.id);
-    return docRef.id;
+    // If UID is provided, use it as the document ID (for Firebase Auth users)
+    // Otherwise, generate a new document ID
+    let userId: string;
+    if (cleanUserData.uid) {
+      userId = cleanUserData.uid;
+      const userRef = doc(db, USERS_COLLECTION, userId);
+      await setDoc(userRef, cleanUserData);
+      console.log('User added successfully with UID as document ID:', userId);
+    } else {
+      const docRef = await addDoc(collection(db, USERS_COLLECTION), cleanUserData);
+      userId = docRef.id;
+      console.log('User added successfully with generated ID:', userId);
+    }
+    
+    return userId;
   } catch (error) {
     console.error('Error adding user to Firestore:', error);
     console.error('User data that caused error:', user);
