@@ -13,6 +13,8 @@ concurrency:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    env:
+      GOOGLE_AI_API_KEY: ${{ secrets.GOOGLE_AI_API_KEY }}
     
     steps:
     - name: Checkout code
