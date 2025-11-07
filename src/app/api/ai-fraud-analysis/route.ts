@@ -90,16 +90,39 @@ export async function POST(request: NextRequest) {
     let apiVersion = process.env.GEMINI_API_VERSION || "v1beta";
     
     // If we got available models, try to find a suitable one
+    // Prefer flash models (higher rate limits) over pro models
     if (availableModels.length > 0) {
-      // Look for gemini-1.5-pro or gemini-1.5-flash first
-      const preferred = availableModels.find(m => m.includes("gemini-1.5-pro") || m.includes("1.5-pro"));
-      const flash = availableModels.find(m => m.includes("gemini-1.5-flash") || m.includes("1.5-flash"));
+      // Look for flash models first (better rate limits)
+      const flash25 = availableModels.find(m => m.includes("gemini-2.5-flash") && !m.includes("lite"));
+      const flash15 = availableModels.find(m => m.includes("gemini-1.5-flash") && !m.includes("lite"));
+      const flashAny = availableModels.find(m => m.includes("flash") && !m.includes("lite"));
+      
+      // Then look for pro models
+      const pro25 = availableModels.find(m => m.includes("gemini-2.5-pro"));
+      const pro15 = availableModels.find(m => m.includes("gemini-1.5-pro"));
+      const proAny = availableModels.find(m => m.includes("pro"));
+      
+      // Any gemini model as last resort
       const anyGemini = availableModels.find(m => m.includes("gemini"));
       
-      if (preferred) {
-        preferredModel = preferred.replace("models/", "").split("/").pop() || preferred;
-      } else if (flash) {
-        preferredModel = flash.replace("models/", "").split("/").pop() || flash;
+      if (flash25) {
+        preferredModel = flash25.replace("models/", "").split("/").pop() || flash25;
+        console.log(`✅ Using flash model (better rate limits): ${preferredModel}`);
+      } else if (flash15) {
+        preferredModel = flash15.replace("models/", "").split("/").pop() || flash15;
+        console.log(`✅ Using flash model (better rate limits): ${preferredModel}`);
+      } else if (flashAny) {
+        preferredModel = flashAny.replace("models/", "").split("/").pop() || flashAny;
+        console.log(`✅ Using flash model (better rate limits): ${preferredModel}`);
+      } else if (pro25) {
+        preferredModel = pro25.replace("models/", "").split("/").pop() || pro25;
+        console.log(`⚠️ Using pro model (may have lower rate limits): ${preferredModel}`);
+      } else if (pro15) {
+        preferredModel = pro15.replace("models/", "").split("/").pop() || pro15;
+        console.log(`⚠️ Using pro model (may have lower rate limits): ${preferredModel}`);
+      } else if (proAny) {
+        preferredModel = proAny.replace("models/", "").split("/").pop() || proAny;
+        console.log(`⚠️ Using pro model (may have lower rate limits): ${preferredModel}`);
       } else if (anyGemini) {
         preferredModel = anyGemini.replace("models/", "").split("/").pop() || anyGemini;
         console.log(`⚠️ Using available model: ${preferredModel}`);
