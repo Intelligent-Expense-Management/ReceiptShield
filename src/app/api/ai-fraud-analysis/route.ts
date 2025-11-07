@@ -142,3 +142,83 @@ Be thorough but fair. Only flag as fraudulent if you identify clear indicators.`
           fraudulent: false,
           fraudProbability: 0.1,
           explanation: `AI analysis unavailable: ${errorData?.error?.message || "Unknown Gemini API error"}. The receipt will be processed with ML analysis only.`,
+          riskFactors: [],
+          confidence: 0.4,
+          error: errorData?.error?.status || "GEMINI_API_ERROR",
+        },
+        { status: 502 }
+      );
+    }
+
+    const geminiData = await geminiResponse.json();
+    const candidate = geminiData?.candidates?.[0];
+    const aiTextResponse = candidate?.content?.parts
+      ?.map((part: any) => part?.text || "")
+      .join("")
+      .trim();
+
+    if (!aiTextResponse) {
+      console.warn("⚠️ Gemini API returned no usable content", geminiData);
+      return NextResponse.json({
+        fraudulent: false,
+        fraudProbability: 0.1,
+        explanation:
+          "AI analysis unavailable: Gemini returned an empty response. The receipt will be processed with ML analysis only.",
+        riskFactors: [],
+        confidence: 0.4,
+        error: "EMPTY_RESPONSE",
+      });
+    }
+
+    let aiResult: any;
+    try {
+      aiResult = JSON.parse(aiTextResponse);
+    } catch (parseError) {
+      console.warn("⚠️ Could not parse Gemini response as JSON", aiTextResponse, parseError);
+      return NextResponse.json({
+        fraudulent: false,
+        fraudProbability: 0.1,
+        explanation:
+          "AI analysis unavailable: Gemini returned unstructured data. The receipt will be processed with ML analysis only.",
+        riskFactors: [],
+        confidence: 0.4,
+        error: "INVALID_JSON",
+        rawResponse: aiTextResponse,
+      });
+    }
+
+    const sanitizedResult = {
+      fraudulent: Boolean(aiResult?.fraudulent),
+      fraudProbability:
+        typeof aiResult?.fraudProbability === "number" && aiResult.fraudProbability >= 0 && aiResult.fraudProbability <= 1
+          ? aiResult.fraudProbability
+          : 0.1,
+      explanation:
+        typeof aiResult?.explanation === "string" && aiResult.explanation.trim().length > 0
+          ? aiResult.explanation
+          : "AI analysis completed, but no detailed explanation was provided.",
+      riskFactors: Array.isArray(aiResult?.riskFactors) ? aiResult.riskFactors : [],
+      confidence:
+        typeof aiResult?.confidence === "number" && aiResult.confidence >= 0 && aiResult.confidence <= 1
+          ? aiResult.confidence
+          : 0.5,
+    };
+
+    return NextResponse.json(sanitizedResult);
+  } catch (error: any) {
+    console.error("❌ AI Fraud Analysis failed:", error);
+    return NextResponse.json(
+      {
+        fraudulent: false,
+        fraudProbability: 0.1,
+        explanation:
+          `AI fraud analysis failed: ${error?.message || "Unknown error"}. The receipt will be processed with ML analysis only.`,
+        riskFactors: [],
+        confidence: 0.3,
+        error: error?.code || "AI_ANALYSIS_FAILED",
+      },
+      { status: 500 }
+    );
+  }
+}
+        

@@ -18,6 +18,14 @@ service cloud.firestore {
     function isCompanyOwner() {
       return request.auth.token.isCompanyOwner == true;
     }
+
+    function hasCompanyClaim() {
+      return request.auth.token.companyId != null;
+    }
+
+    function matchesCompany(resource) {
+      return resource.data.companyId != null && hasCompanyClaim() && resource.data.companyId == getUserCompanyId();
+    }
     
     function canManageSubscription() {
       return request.auth.token.canManageSubscription == true;
@@ -33,10 +41,26 @@ service cloud.firestore {
 
     // Users collection - company isolation
     match /users/{userId} {
-      allow read, write: if isAuthenticated() && 
-        (resource.data.companyId == getUserCompanyId() || isPlatformAdmin());
-      allow create: if isAuthenticated() && 
-        (request.resource.data.companyId == getUserCompanyId() || isPlatformAdmin());
+      allow read: if isAuthenticated() && (
+        userId == request.auth.uid ||
+        (resource != null && matchesCompany(resource)) ||
+        isPlatformAdmin()
+      );
+
+      allow create: if isAuthenticated() && (
+        userId == request.auth.uid ||
+        (request.resource.data.companyId != null && hasCompanyClaim() && request.resource.data.companyId == getUserCompanyId()) ||
+        isPlatformAdmin()
+      );
+
+      allow update: if isAuthenticated() && (
+        userId == request.auth.uid ||
+        (resource != null && matchesCompany(resource)) ||
+        isPlatformAdmin()
+      );
+      allow delete: if isAuthenticated() && (
+        userId == request.auth.uid || isPlatformAdmin()
+      );
     }
 
     // Companies collection
