@@ -39,6 +39,14 @@ export async function addReceipt(receipt: Omit<ProcessedReceipt, 'id'>): Promise
     // Remove any remaining undefined values, but preserve nested objects
     const finalReceiptData = cleanFirestoreData(receiptData);
     
+    // Debug logging for companyId and fraud_analysis before save
+    console.log('🔍 Receipt data before save:', {
+      companyId: finalReceiptData.companyId,
+      companyIdType: typeof finalReceiptData.companyId,
+      companyIdIsEmpty: finalReceiptData.companyId === '' || finalReceiptData.companyId == null,
+      hasFraudAnalysis: !!finalReceiptData.fraud_analysis
+    });
+    
     // Debug logging for fraud_analysis before save
     if (finalReceiptData.fraud_analysis) {
       console.log('💾 Saving receipt with fraud_analysis:', {
@@ -54,6 +62,13 @@ export async function addReceipt(receipt: Omit<ProcessedReceipt, 'id'>): Promise
     return docRef.id;
   } catch (error) {
     console.error('Error adding receipt to Firestore:', error);
+    if (error instanceof Error) {
+      console.error('Error details:', {
+        message: error.message,
+        name: error.name,
+        stack: error.stack
+      });
+    }
     throw new Error(`Failed to add receipt: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }

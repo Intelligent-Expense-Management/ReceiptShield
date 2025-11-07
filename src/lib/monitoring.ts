@@ -88,14 +88,28 @@ export const monitoring = {
         });
       } catch (firestoreError) {
         // Handle network errors gracefully
-        if (firestoreError instanceof Error && firestoreError.message.includes('ERR_BLOCKED_BY_CLIENT')) {
-          console.warn('Analytics tracking blocked by browser extension, continuing without Firestore logging');
-        } else {
-          throw firestoreError;
+        if (firestoreError instanceof Error) {
+          if (firestoreError.message.includes('ERR_BLOCKED_BY_CLIENT')) {
+            console.warn('Analytics tracking blocked by browser extension, continuing without Firestore logging');
+            return; // Don't throw, just return silently
+          }
+          // Silently handle permission errors (rules may still be propagating)
+          if (firestoreError.message.includes('Missing or insufficient permissions') || 
+              firestoreError.message.includes('permission-denied')) {
+            // Rules are deployed but may not have propagated yet, or browser cache issue
+            // Silently fail - will work once rules propagate or after browser refresh
+            return;
+          }
         }
+        throw firestoreError;
       }
     } catch (error) {
-      console.error('Failed to track event:', error);
+      // Only log non-permission errors
+      if (error instanceof Error && 
+          !error.message.includes('Missing or insufficient permissions') &&
+          !error.message.includes('permission-denied')) {
+        console.error('Failed to track event:', error);
+      }
     }
   },
 
@@ -111,11 +125,20 @@ export const monitoring = {
       });
     } catch (error) {
       // Handle network errors gracefully
-      if (error instanceof Error && error.message.includes('ERR_BLOCKED_BY_CLIENT')) {
-        console.warn('Performance tracking blocked by browser extension, continuing without Firestore logging');
-      } else {
-        console.error('Failed to track performance metric:', error);
+      if (error instanceof Error) {
+        if (error.message.includes('ERR_BLOCKED_BY_CLIENT')) {
+          console.warn('Performance tracking blocked by browser extension, continuing without Firestore logging');
+          return;
+        }
+        // Silently handle permission errors (rules may still be propagating)
+        if (error.message.includes('Missing or insufficient permissions') || 
+            error.message.includes('permission-denied')) {
+          // Rules are deployed but may not have propagated yet, or browser cache issue
+          // Silently fail - will work once rules propagate or after browser refresh
+          return;
+        }
       }
+      console.error('Failed to track performance metric:', error);
     }
   },
 

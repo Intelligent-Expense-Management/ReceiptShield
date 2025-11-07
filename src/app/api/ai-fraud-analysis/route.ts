@@ -5,24 +5,78 @@ export const runtime = "nodejs"; // ensure Buffer is available (optional but saf
 
 export async function POST(request: NextRequest) {
   try {
-    const { items, imageUrl, receiptData } = await request.json();
     console.log("🤖 AI Fraud Analysis Request received");
+    
+    let requestBody;
+    try {
+      requestBody = await request.json();
+    } catch (parseError) {
+      console.error("❌ Failed to parse request body:", parseError);
+      return NextResponse.json(
+        {
+          fraudulent: false,
+          fraudProbability: 0.1,
+          explanation: "Invalid request format. The receipt will be processed with ML analysis only.",
+          riskFactors: [],
+          confidence: 0.3,
+          error: "INVALID_REQUEST",
+        },
+        { status: 400 }
+      );
+    }
+    
+    const { items, imageUrl, receiptData } = requestBody;
+    console.log("📋 Request data:", {
+      itemsCount: Array.isArray(items) ? items.length : 0,
+      hasImageUrl: !!imageUrl,
+      hasReceiptData: !!receiptData,
+    });
 
-    const apiKey = process.env.GOOGLE_AI_API_KEY;
+    // Check for API key in both possible environment variable names
+    const apiKey = process.env.GOOGLE_AI_API_KEY || process.env.GOOGLE_API_KEY;
     if (!apiKey || apiKey === "your_google_ai_api_key_here") {
       console.warn("⚠️ Google AI API key not configured");
+      console.warn("⚠️ Checked GOOGLE_AI_API_KEY:", process.env.GOOGLE_AI_API_KEY ? "exists" : "not set");
+      console.warn("⚠️ Checked GOOGLE_API_KEY:", process.env.GOOGLE_API_KEY ? "exists" : "not set");
       return NextResponse.json(
         {
           fraudulent: false,
           fraudProbability: 0.1,
           explanation:
-            "AI analysis unavailable: Google Gemini API key not configured. Please set GOOGLE_AI_API_KEY environment variable.",
+            "AI analysis unavailable: Google Gemini API key not configured. Please set GOOGLE_AI_API_KEY or GOOGLE_API_KEY environment variable.",
           error: "API_KEY_NOT_CONFIGURED",
           riskFactors: [],
           confidence: 0.7,
         },
         { status: 500 }
       );
+    }
+    
+    console.log("✅ API key found, length:", apiKey.length);
+
+    // First, try to list available models to see what we have access to
+    let availableModels: string[] = [];
+    try {
+      console.log("🔍 Checking available models...");
+      const listModelsUrl = "https://generativelanguage.googleapis.com/v1beta/models";
+      const listResponse = await fetch(listModelsUrl, {
+        method: "GET",
+        headers: {
+          "X-Goog-Api-Key": apiKey,
+        },
+      });
+      
+      if (listResponse.ok) {
+        const modelsData = await listResponse.json();
+        availableModels = (modelsData.models || []).map((m: any) => m.name).filter((name: string) => 
+          name && (name.includes("gemini") || name.includes("models/"))
+        );
+        console.log("✅ Available models:", availableModels.slice(0, 5).join(", "));
+      } else {
+        console.warn("⚠️ Could not list models, will try defaults");
+      }
+    } catch (listError) {
+      console.warn("⚠️ Error listing models:", listError);
     }
 
     // Prepare receipt data text
@@ -31,8 +85,60 @@ export async function POST(request: NextRequest) {
         ? items.map((it: any) => `${it?.label ?? "field"}: ${it?.value ?? ""}`).join("\n")
         : "";
 
-    const model = process.env.GEMINI_MODEL || "gemini-1.5-flash"; // safer generally-available default
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+    // Determine which model to use - check available models first, then fallback to defaults
+    let preferredModel = process.env.GEMINI_MODEL;
+    let apiVersion = process.env.GEMINI_API_VERSION || "v1beta";
+    
+    // If we got available models, try to find a suitable one
+    // Prefer flash models (higher rate limits) over pro models
+    if (availableModels.length > 0) {
+      // Look for flash models first (better rate limits)
+      const flash25 = availableModels.find(m => m.includes("gemini-2.5-flash") && !m.includes("lite"));
+      const flash15 = availableModels.find(m => m.includes("gemini-1.5-flash") && !m.includes("lite"));
+      const flashAny = availableModels.find(m => m.includes("flash") && !m.includes("lite"));
+      
+      // Then look for pro models
+      const pro25 = availableModels.find(m => m.includes("gemini-2.5-pro"));
+      const pro15 = availableModels.find(m => m.includes("gemini-1.5-pro"));
+      const proAny = availableModels.find(m => m.includes("pro"));
+      
+      // Any gemini model as last resort
+      const anyGemini = availableModels.find(m => m.includes("gemini"));
+      
+      if (flash25) {
+        preferredModel = flash25.replace("models/", "").split("/").pop() || flash25;
+        console.log(`✅ Using flash model (better rate limits): ${preferredModel}`);
+      } else if (flash15) {
+        preferredModel = flash15.replace("models/", "").split("/").pop() || flash15;
+        console.log(`✅ Using flash model (better rate limits): ${preferredModel}`);
+      } else if (flashAny) {
+        preferredModel = flashAny.replace("models/", "").split("/").pop() || flashAny;
+        console.log(`✅ Using flash model (better rate limits): ${preferredModel}`);
+      } else if (pro25) {
+        preferredModel = pro25.replace("models/", "").split("/").pop() || pro25;
+        console.log(`⚠️ Using pro model (may have lower rate limits): ${preferredModel}`);
+      } else if (pro15) {
+        preferredModel = pro15.replace("models/", "").split("/").pop() || pro15;
+        console.log(`⚠️ Using pro model (may have lower rate limits): ${preferredModel}`);
+      } else if (proAny) {
+        preferredModel = proAny.replace("models/", "").split("/").pop() || proAny;
+        console.log(`⚠️ Using pro model (may have lower rate limits): ${preferredModel}`);
+      } else if (anyGemini) {
+        preferredModel = anyGemini.replace("models/", "").split("/").pop() || anyGemini;
+        console.log(`⚠️ Using available model: ${preferredModel}`);
+      }
+    }
+    
+    // Default fallback if no model found
+    if (!preferredModel) {
+      preferredModel = "gemini-1.5-pro";
+    }
+    
+    // Clean up model name (remove "models/" prefix if present)
+    preferredModel = preferredModel.replace(/^models\//, "");
+    
+    const apiUrl = `https://generativelanguage.googleapis.com/${apiVersion}/models/${preferredModel}:generateContent`;
+    console.log(`🔧 Using Gemini API: ${apiVersion}/models/${preferredModel}`);
 
     const parts: any[] = [
       { text: `You are an expert fraud detection analyst specializing in expense receipt analysis. Analyze the following receipt data and determine if there are any indicators of fraud or suspicious activity.
@@ -72,21 +178,46 @@ Be thorough but fair. Only flag as fraudulent if you identify clear indicators.`
     // If image URL is provided, include it correctly
     if (imageUrl && !imageUrl.startsWith("data:")) {
       try {
-        const imageResponse = await fetch(imageUrl);
-        const imageBuffer = await imageResponse.arrayBuffer();
-        const imageBase64 = Buffer.from(imageBuffer).toString("base64");
-        parts.push({
-          inlineData: {
-            mimeType: imageResponse.headers.get("content-type") || "image/jpeg",
-            data: imageBase64,
-          },
+        console.log("📸 Fetching image for analysis:", imageUrl);
+        // Add timeout for image fetch
+        const imageController = new AbortController();
+        const imageTimeout = setTimeout(() => imageController.abort(), 10000); // 10 second timeout
+        
+        const imageResponse = await fetch(imageUrl, {
+          signal: imageController.signal,
         });
-      } catch (e) {
-        console.warn("⚠️ Could not include image in analysis:", e);
+        clearTimeout(imageTimeout);
+        
+        if (!imageResponse.ok) {
+          console.warn(`⚠️ Image fetch returned ${imageResponse.status}, skipping image in analysis`);
+        } else {
+          const imageBuffer = await imageResponse.arrayBuffer();
+          const imageBase64 = Buffer.from(imageBuffer).toString("base64");
+          const contentType = imageResponse.headers.get("content-type") || "image/jpeg";
+          
+          // Check image size (Gemini has limits)
+          if (imageBuffer.byteLength > 20 * 1024 * 1024) { // 20MB limit
+            console.warn("⚠️ Image too large for Gemini API, skipping image in analysis");
+          } else {
+            parts.push({
+              inlineData: {
+                mimeType: contentType,
+                data: imageBase64,
+              },
+            });
+            console.log("✅ Image included in analysis");
+          }
+        }
+      } catch (e: any) {
+        if (e.name === 'AbortError') {
+          console.warn("⚠️ Image fetch timed out, continuing without image");
+        } else {
+          console.warn("⚠️ Could not include image in analysis:", e.message || e);
+        }
       }
     }
 
-    const requestBody = {
+    const geminiRequestBody = {
       contents: [
         {
           role: "user",        // <-- include role
@@ -97,21 +228,61 @@ Be thorough but fair. Only flag as fraudulent if you identify clear indicators.`
         temperature: 0.3,
         topK: 40,
         topP: 0.95,
-        maxOutputTokens: 1024,
+        maxOutputTokens: 4096, // Increased from 1024 to allow complete fraud analysis responses
       },
     };
 
     console.log("🔍 Calling Google Gemini API...");
-    const geminiResponse = await fetch(apiUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Goog-Api-Key": apiKey, // <-- send key in header
-      },
-      // Avoid edge caches if any proxy is in front (optional)
-      cache: "no-store",
-      body: JSON.stringify(requestBody),
-    });
+    
+    // Add timeout to prevent hanging requests
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+    }, 60000); // 60 second timeout for Gemini API
+    
+    let geminiResponse: Response;
+    try {
+      geminiResponse = await fetch(apiUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Goog-Api-Key": apiKey, // <-- send key in header
+        },
+        // Avoid edge caches if any proxy is in front (optional)
+        cache: "no-store",
+        body: JSON.stringify(geminiRequestBody),
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+    } catch (fetchError: any) {
+      clearTimeout(timeoutId);
+      if (fetchError.name === 'AbortError') {
+        console.error("❌ Gemini API request timed out after 60 seconds");
+        return NextResponse.json(
+          {
+            fraudulent: false,
+            fraudProbability: 0.1,
+            explanation: "AI analysis timed out. The receipt will be processed with ML analysis only.",
+            riskFactors: [],
+            confidence: 0.3,
+            error: "TIMEOUT",
+          },
+          { status: 504 } // Gateway Timeout
+        );
+      }
+      console.error("❌ Gemini API network error:", fetchError);
+      return NextResponse.json(
+        {
+          fraudulent: false,
+          fraudProbability: 0.1,
+          explanation: `AI analysis network error: ${fetchError.message || "Failed to connect to Gemini API"}. The receipt will be processed with ML analysis only.`,
+          riskFactors: [],
+          confidence: 0.3,
+          error: "NETWORK_ERROR",
+        },
+        { status: 502 }
+      );
+    }
 
     if (!geminiResponse.ok) {
       const errorText = await geminiResponse.text();
@@ -122,36 +293,93 @@ Be thorough but fair. Only flag as fraudulent if you identify clear indicators.`
         errorData = { error: { message: errorText } };
       }
 
-      if (geminiResponse.status === 429) {
-        console.warn("⚠️ Gemini API rate limit exceeded (429)");
-        return NextResponse.json({
-          fraudulent: false,
-          fraudProbability: 0.1,
-          explanation:
-            "AI analysis temporarily unavailable: Google Gemini API rate limit exceeded. Please try again in a few moments.",
-          riskFactors: [],
-          confidence: 0.3,
-          error: "RATE_LIMIT_EXCEEDED",
-          retryAfter: "Please wait a few minutes before trying again",
-        });
+      // If model not found, try fallback models
+      if (geminiResponse.status === 404 && errorData?.error?.message?.includes("not found")) {
+        const fallbackModels = [
+          { version: "v1beta", model: "gemini-1.5-flash" },
+          { version: "v1beta", model: "gemini-pro" },
+          { version: "v1", model: "gemini-pro" },
+        ];
+        
+        for (const fallback of fallbackModels) {
+          if (fallback.version === apiVersion && fallback.model === preferredModel) {
+            continue; // Skip if it's the same as what we just tried
+          }
+          
+          console.warn(`⚠️ Trying fallback: ${fallback.version}/models/${fallback.model}`);
+          try {
+            const fallbackUrl = `https://generativelanguage.googleapis.com/${fallback.version}/models/${fallback.model}:generateContent`;
+            const fallbackController = new AbortController();
+            const fallbackTimeout = setTimeout(() => fallbackController.abort(), 60000);
+            
+            const fallbackResponse = await fetch(fallbackUrl, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "X-Goog-Api-Key": apiKey,
+              },
+              cache: "no-store",
+              body: JSON.stringify(geminiRequestBody),
+              signal: fallbackController.signal,
+            });
+            
+            clearTimeout(fallbackTimeout);
+            
+            if (fallbackResponse.ok) {
+              console.log(`✅ Fallback model worked: ${fallback.version}/models/${fallback.model}`);
+              geminiResponse = fallbackResponse;
+              break; // Success, exit fallback loop
+            } else {
+              const fallbackErrorText = await fallbackResponse.text();
+              console.warn(`⚠️ Fallback ${fallback.model} failed:`, fallbackErrorText.substring(0, 200));
+            }
+          } catch (fallbackError: any) {
+            console.warn(`⚠️ Fallback ${fallback.model} error:`, fallbackError.message);
+            // Continue to next fallback
+          }
+        }
       }
 
-      console.error("❌ Gemini API error:", errorText);
-      return NextResponse.json(
-        {
-          fraudulent: false,
-          fraudProbability: 0.1,
-          explanation: `AI analysis unavailable: ${errorData?.error?.message || "Unknown Gemini API error"}. The receipt will be processed with ML analysis only.`,
-          riskFactors: [],
-          confidence: 0.4,
-          error: errorData?.error?.status || "GEMINI_API_ERROR",
-        },
-        { status: 502 }
-      );
+      // If still not ok after fallback attempt, return error
+      if (!geminiResponse.ok) {
+        if (geminiResponse.status === 429) {
+          console.warn("⚠️ Gemini API rate limit exceeded (429)");
+          return NextResponse.json({
+            fraudulent: false,
+            fraudProbability: 0.1,
+            explanation:
+              "AI analysis temporarily unavailable: Google Gemini API rate limit exceeded. Please try again in a few moments.",
+            riskFactors: [],
+            confidence: 0.3,
+            error: "RATE_LIMIT_EXCEEDED",
+            retryAfter: "Please wait a few minutes before trying again",
+          });
+        }
+
+        console.error("❌ Gemini API error:", errorText);
+        return NextResponse.json(
+          {
+            fraudulent: false,
+            fraudProbability: 0.1,
+            explanation: `AI analysis unavailable: ${errorData?.error?.message || "Unknown Gemini API error"}. The receipt will be processed with ML analysis only.`,
+            riskFactors: [],
+            confidence: 0.4,
+            error: errorData?.error?.status || "GEMINI_API_ERROR",
+          },
+          { status: 502 }
+        );
+      }
     }
 
     const geminiData = await geminiResponse.json();
     const candidate = geminiData?.candidates?.[0];
+    const finishReason = candidate?.finishReason;
+    
+    // Check if response was truncated
+    if (finishReason === 'MAX_TOKENS' || finishReason === 'OTHER') {
+      console.warn(`⚠️ Gemini response may be incomplete (finishReason: ${finishReason})`);
+    }
+    
     const aiTextResponse = candidate?.content?.parts
       ?.map((part: any) => part?.text || "")
       .join("")
@@ -170,21 +398,148 @@ Be thorough but fair. Only flag as fraudulent if you identify clear indicators.`
       });
     }
 
+    // Clean up the response - remove markdown code blocks if present
+    let cleanedResponse = aiTextResponse.trim();
+    
+    // Remove markdown code block markers (```json and ```)
+    cleanedResponse = cleanedResponse.replace(/^```json\s*/i, '');
+    cleanedResponse = cleanedResponse.replace(/^```\s*/i, '');
+    cleanedResponse = cleanedResponse.replace(/\s*```$/i, '');
+    cleanedResponse = cleanedResponse.trim();
+    
+    // Try to extract JSON if it's embedded in other text
+    // Use a more robust approach: find the largest valid JSON object
+    let jsonMatch = cleanedResponse.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      let potentialJson = jsonMatch[0];
+      
+      // Try to find complete JSON by balancing braces
+      let braceCount = 0;
+      let lastValidIndex = -1;
+      for (let i = 0; i < potentialJson.length; i++) {
+        if (potentialJson[i] === '{') braceCount++;
+        if (potentialJson[i] === '}') {
+          braceCount--;
+          if (braceCount === 0) {
+            lastValidIndex = i;
+            break;
+          }
+        }
+      }
+      
+      if (lastValidIndex > 0) {
+        cleanedResponse = potentialJson.substring(0, lastValidIndex + 1);
+      } else {
+        cleanedResponse = potentialJson;
+      }
+    }
+    
     let aiResult: any;
     try {
-      aiResult = JSON.parse(aiTextResponse);
-    } catch (parseError) {
-      console.warn("⚠️ Could not parse Gemini response as JSON", aiTextResponse, parseError);
-      return NextResponse.json({
-        fraudulent: false,
-        fraudProbability: 0.1,
-        explanation:
-          "AI analysis unavailable: Gemini returned unstructured data. The receipt will be processed with ML analysis only.",
-        riskFactors: [],
-        confidence: 0.4,
-        error: "INVALID_JSON",
-        rawResponse: aiTextResponse,
-      });
+      aiResult = JSON.parse(cleanedResponse);
+    } catch (parseError: any) {
+      // If JSON is incomplete or has unterminated strings, try to extract what we can
+      const isIncompleteError = parseError.message?.includes('end of JSON input') || 
+                                parseError.message?.includes('Unexpected') ||
+                                parseError.message?.includes('Unterminated string') ||
+                                parseError.message?.includes('Unexpected token');
+      
+      if (isIncompleteError) {
+        console.warn("⚠️ Incomplete or malformed JSON response, attempting to extract partial data");
+        
+        // Try to extract partial data from incomplete JSON
+        try {
+          // Find all key-value pairs we can extract (handle unterminated strings)
+          const fraudulentMatch = cleanedResponse.match(/"fraudulent"\s*:\s*(true|false)/i);
+          const probabilityMatch = cleanedResponse.match(/"fraudProbability"\s*:\s*([0-9.]+)/i);
+          
+          // For explanation, extract everything after the opening quote until end or next quote (handles unterminated strings)
+          let explanationText = '';
+          const explanationStartMatch = cleanedResponse.match(/"explanation"\s*:\s*"/i);
+          if (explanationStartMatch) {
+            const startIndex = explanationStartMatch.index! + explanationStartMatch[0].length;
+            // Extract everything from start to end of string or end of response
+            // Handle escaped quotes and newlines
+            let inString = true;
+            let extracted = '';
+            for (let i = startIndex; i < cleanedResponse.length; i++) {
+              const char = cleanedResponse[i];
+              if (char === '\\') {
+                // Skip escaped characters
+                if (i + 1 < cleanedResponse.length) {
+                  extracted += char + cleanedResponse[i + 1];
+                  i++;
+                  continue;
+                }
+              } else if (char === '"' && (i === 0 || cleanedResponse[i - 1] !== '\\')) {
+                // End of string (not escaped)
+                break;
+              } else if (char === '\n' && cleanedResponse.substring(i, i + 2) === '\n\n') {
+                // Likely end of explanation if we hit double newline
+                break;
+              }
+              extracted += char;
+            }
+            explanationText = extracted.trim();
+          }
+          
+          // Extract riskFactors if present (array)
+          const riskFactorsMatch = cleanedResponse.match(/"riskFactors"\s*:\s*\[([^\]]*)\]/i);
+          const riskFactors: string[] = [];
+          if (riskFactorsMatch) {
+            const factorsText = riskFactorsMatch[1];
+            const factorMatches = factorsText.match(/"([^"]+)"/g);
+            if (factorMatches) {
+              factorMatches.forEach((match: string) => {
+                const factor = match.replace(/"/g, '').trim();
+                if (factor) riskFactors.push(factor);
+              });
+            }
+          }
+          
+          // Extract confidence if present
+          const confidenceMatch = cleanedResponse.match(/"confidence"\s*:\s*([0-9.]+)/i);
+          
+          if (fraudulentMatch || probabilityMatch) {
+            aiResult = {
+              fraudulent: fraudulentMatch ? fraudulentMatch[1].toLowerCase() === 'true' : false,
+              fraudProbability: probabilityMatch ? parseFloat(probabilityMatch[1]) : 0.5,
+              explanation: explanationText 
+                ? explanationText + " (Response was truncated, analysis may be incomplete.)"
+                : "AI analysis was truncated but indicates potential fraud concerns.",
+              riskFactors: riskFactors.length > 0 ? riskFactors : [],
+              confidence: confidenceMatch ? parseFloat(confidenceMatch[1]) : 0.6,
+            };
+            console.log("✅ Extracted partial data from incomplete JSON");
+          } else {
+            throw parseError; // Re-throw if we can't extract anything
+          }
+        } catch (extractError) {
+          console.warn("⚠️ Could not parse or extract from Gemini response", cleanedResponse.substring(0, 500), parseError);
+          return NextResponse.json({
+            fraudulent: false,
+            fraudProbability: 0.1,
+            explanation:
+              "AI analysis unavailable: Gemini returned incomplete or unstructured data. The receipt will be processed with ML analysis only.",
+            riskFactors: [],
+            confidence: 0.4,
+            error: "INVALID_JSON",
+            rawResponse: aiTextResponse.substring(0, 500), // Only log first 500 chars
+          });
+        }
+      } else {
+        console.warn("⚠️ Could not parse Gemini response as JSON", cleanedResponse.substring(0, 500), parseError);
+        return NextResponse.json({
+          fraudulent: false,
+          fraudProbability: 0.1,
+          explanation:
+            "AI analysis unavailable: Gemini returned unstructured data. The receipt will be processed with ML analysis only.",
+          riskFactors: [],
+          confidence: 0.4,
+          error: "INVALID_JSON",
+          rawResponse: aiTextResponse.substring(0, 500), // Only log first 500 chars
+        });
+      }
     }
 
     const sanitizedResult = {
@@ -207,6 +562,13 @@ Be thorough but fair. Only flag as fraudulent if you identify clear indicators.`
     return NextResponse.json(sanitizedResult);
   } catch (error: any) {
     console.error("❌ AI Fraud Analysis failed:", error);
+    console.error("Error stack:", error?.stack);
+    console.error("Error details:", {
+      name: error?.name,
+      message: error?.message,
+      code: error?.code,
+    });
+    
     return NextResponse.json(
       {
         fraudulent: false,
@@ -215,7 +577,7 @@ Be thorough but fair. Only flag as fraudulent if you identify clear indicators.`
           `AI fraud analysis failed: ${error?.message || "Unknown error"}. The receipt will be processed with ML analysis only.`,
         riskFactors: [],
         confidence: 0.3,
-        error: error?.code || "AI_ANALYSIS_FAILED",
+        error: error?.code || error?.name || "AI_ANALYSIS_FAILED",
       },
       { status: 500 }
     );
