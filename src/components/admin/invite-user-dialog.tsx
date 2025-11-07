@@ -258,15 +258,33 @@ export function InviteUserDialog({
         companyId: currentUser.companyId, // Include companyId so users are assigned to the correct company
       };
 
+      // Get Firebase ID token for authentication
+      const { auth } = await import('@/lib/firebase');
+      const { getIdToken } = await import('firebase/auth');
+      let authToken: string | null = null;
+      
+      if (auth.currentUser) {
+        try {
+          authToken = await getIdToken(auth.currentUser);
+        } catch (tokenError) {
+          console.warn('Failed to get auth token:', tokenError);
+        }
+      }
+      
       // Send invitation
       const apiUrl = process.env.NODE_ENV === 'production' 
         ? 'https://receiptshield-backend--recieptshield.us-central1.hosted.app/api/send-invitation'
         : '/api/send-invitation';
       
       console.log('📧 Calling API:', apiUrl);
+      const headers: HeadersInit = { 'Content-Type': 'application/json' };
+      if (authToken) {
+        headers['Authorization'] = `Bearer ${authToken}`;
+      }
+      
       const response = await fetch(apiUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           ...invitationData,
           message: data.message,

@@ -45,7 +45,7 @@ export function EmployeeView({ onGeneratePdf, onGenerateCsv, isGenerating, repor
 
   const loadData = async () => {
     if (user && user.role === 'manager') {
-      const teamMembers = await getEmployeesForManager(user.id);
+      const teamMembers = await getEmployeesForManager(user.id, user.companyId);
       setEmployees(teamMembers);
 
       const allReceipts: Record<string, ProcessedReceipt[]> = {};

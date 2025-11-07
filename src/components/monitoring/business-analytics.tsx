@@ -49,30 +49,36 @@ export function BusinessAnalytics() {
       ]);
 
       // Calculate business metrics from analytics data
+      // TODO: Replace with real data from Firestore analytics collection
+      // For now, use analytics data where available, otherwise show 0
       const businessMetrics: BusinessMetrics = {
         totalUsers: analyticsData.statistics?.uniqueUsers || 0,
         activeUsers: analyticsData.statistics?.uniqueUsers || 0,
-        newUsersToday: Math.floor(Math.random() * 10), // Mock data
+        newUsersToday: analyticsData.statistics?.newUsersToday || 0, // TODO: Calculate from user creation dates
         totalSessions: analyticsData.statistics?.totalEvents || 0,
-        averageSessionDuration: Math.floor(Math.random() * 30) + 5, // Mock data
-        topFeatures: [
-          { name: 'Receipt Upload', usage: 45 },
-          { name: 'Expense Tracking', usage: 32 },
-          { name: 'Reports', usage: 28 },
-          { name: 'Settings', usage: 15 },
-          { name: 'Profile', usage: 12 }
+        averageSessionDuration: performanceData.averageResponseTime 
+          ? Math.round(performanceData.averageResponseTime / 1000 / 60) 
+          : 0, // Convert ms to minutes, or 0 if not available
+        topFeatures: analyticsData.topFeatures || [
+          // Fallback empty data if not available
+          { name: 'Receipt Upload', usage: 0 },
+          { name: 'Expense Tracking', usage: 0 },
+          { name: 'Reports', usage: 0 },
+          { name: 'Settings', usage: 0 },
+          { name: 'Profile', usage: 0 }
         ],
-        userGrowth: [
-          { date: 'Mon', users: 12 },
-          { date: 'Tue', users: 18 },
-          { date: 'Wed', users: 15 },
-          { date: 'Thu', users: 22 },
-          { date: 'Fri', users: 28 },
-          { date: 'Sat', users: 20 },
-          { date: 'Sun', users: 16 }
+        userGrowth: analyticsData.userGrowth || [
+          // Fallback empty data if not available
+          { date: 'Mon', users: 0 },
+          { date: 'Tue', users: 0 },
+          { date: 'Wed', users: 0 },
+          { date: 'Thu', users: 0 },
+          { date: 'Fri', users: 0 },
+          { date: 'Sat', users: 0 },
+          { date: 'Sun', users: 0 }
         ],
-        revenue: Math.floor(Math.random() * 5000) + 1000, // Mock data
-        conversionRate: Math.floor(Math.random() * 20) + 5 // Mock data
+        revenue: analyticsData.revenue || 0, // TODO: Calculate from subscription data
+        conversionRate: analyticsData.conversionRate || 0 // TODO: Calculate from trial to paid conversions
       };
 
       setMetrics(businessMetrics);

@@ -4,6 +4,8 @@
 import { useState, useEffect } from 'react';
 import type { User } from '@/types';
 import { getUsers, getManagers, updateUser, initializeDefaultUsers } from '@/lib/firebase-user-store';
+import { getAllCompanies, getCompany } from '@/lib/firebase-company-store';
+import type { Company } from '@/types';
 import {
   Table,
   TableBody,
@@ -15,7 +17,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, Pencil, UserCog, UserX, UserCheck, AlertTriangle } from 'lucide-react';
+import { MoreHorizontal, Pencil, UserCog, UserX, UserCheck, AlertTriangle, Building2 } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,6 +39,7 @@ import {
 import { ReassignSupervisorDialog } from './reassign-supervisor-dialog';
 import { EditUserDialog } from './edit-user-dialog';
 import { ManagePermissionsDialog } from './manage-permissions-dialog';
+import { AssignCompanyDialog } from './assign-company-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/auth-context';
 import { cn } from '@/lib/utils';
@@ -46,11 +49,14 @@ export function UserManagementTable() {
     const { user: currentUser } = useAuth();
     const [users, setUsers] = useState<User[]>([]);
     const [managers, setManagers] = useState<User[]>([]);
+    const [companies, setCompanies] = useState<Company[]>([]);
+    const [companyMap, setCompanyMap] = useState<Record<string, Company>>({});
     const [selectedUser, setSelectedUser] = useState<User | null>(null);
     const [isReassignDialogOpen, setIsReassignDialogOpen] = useState(false);
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
     const [isManagePermissionsDialogOpen, setIsManagePermissionsDialogOpen] = useState(false);
     const [isDeactivateConfirmOpen, setIsDeactivateConfirmOpen] = useState(false);
+    const [isAssignCompanyDialogOpen, setIsAssignCompanyDialogOpen] = useState(false);
     const [loading, setLoading] = useState(true);
     const { toast } = useToast();
 
@@ -67,6 +73,38 @@ export function UserManagementTable() {
             console.log('📊 Users loaded:', allUsers.length, 'users,', allManagers.length, 'managers', companyId ? `for company ${companyId}` : '(all companies)');
             setUsers(allUsers);
             setManagers(allManagers);
+            
+            // Load companies if platform admin
+            if (currentUser?.isPlatformAdmin) {
+                const allCompanies = await getAllCompanies();
+                setCompanies(allCompanies);
+                
+                // Create company map for quick lookup
+                const map: Record<string, Company> = {};
+                allCompanies.forEach(company => {
+                    map[company.id] = company;
+                });
+                setCompanyMap(map);
+                
+                // Load company info for users that have companyId
+                const companyPromises = allUsers
+                    .filter(u => u.companyId)
+                    .map(async (u) => {
+                        if (!map[u.companyId!]) {
+                            try {
+                                const company = await getCompany(u.companyId!);
+                                if (company) {
+                                    map[u.companyId!] = company;
+                                }
+                            } catch (error) {
+                                console.error(`Error loading company ${u.companyId}:`, error);
+                            }
+                        }
+                    });
+                await Promise.all(companyPromises);
+                setCompanyMap({ ...map });
+            }
+            
             setLoading(false);
         } catch (error) {
             console.error('❌ Error loading users:', error);
@@ -161,6 +199,33 @@ export function UserManagementTable() {
         await loadData();
     };
 
+    const handleOpenAssignCompanyDialog = (user: User) => {
+        setSelectedUser(user);
+        setIsAssignCompanyDialogOpen(true);
+    };
+
+    const handleAssignCompany = async (companyId: string) => {
+        if (!selectedUser) return;
+
+        try {
+            await updateUser(selectedUser.id, { companyId });
+            toast({
+                title: 'Success',
+                description: `User assigned to company successfully.`,
+            });
+            setIsAssignCompanyDialogOpen(false);
+            setSelectedUser(null);
+            await loadData();
+        } catch (error) {
+            console.error('Error assigning company:', error);
+            toast({
+                title: 'Error',
+                description: 'Failed to assign company. Please try again.',
+                variant: 'destructive',
+            });
+        }
+    };
+
     const getSupervisorName = (supervisorId?: string) => {
         if (!supervisorId) return 'N/A';
         const supervisor = managers.find(m => m.id === supervisorId);
@@ -185,6 +250,9 @@ export function UserManagementTable() {
                 <TableRow>
                     <TableHead>User</TableHead>
                     <TableHead>Role</TableHead>
+                    {currentUser?.isPlatformAdmin && (
+                        <TableHead>Company</TableHead>
+                    )}
                     <TableHead className="hidden md:table-cell">Supervisor</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -193,7 +261,7 @@ export function UserManagementTable() {
             <TableBody>
                 {users.length === 0 ? (
                     <TableRow>
-                        <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={currentUser?.isPlatformAdmin ? 6 : 5} className="text-center py-8 text-muted-foreground">
                             No users found
                         </TableCell>
                     </TableRow>
@@ -232,6 +300,22 @@ export function UserManagementTable() {
                                 )}
                             </div>
                         </TableCell>
+                        {currentUser?.isPlatformAdmin && (
+                            <TableCell>
+                                {user.companyId ? (
+                                    <div className="flex items-center gap-2">
+                                        <Building2 className="h-4 w-4 text-muted-foreground" />
+                                        <span className="font-medium">
+                                            {companyMap[user.companyId]?.name || user.companyId}
+                                        </span>
+                                    </div>
+                                ) : (
+                                    <Badge variant="outline" className="text-orange-600 border-orange-300">
+                                        No Company
+                                    </Badge>
+                                )}
+                            </TableCell>
+                        )}
                         <TableCell className="hidden md:table-cell">
                             {getSupervisorName(user.supervisorId)}
                         </TableCell>
@@ -258,6 +342,12 @@ export function UserManagementTable() {
                                         <Shield className="mr-2 h-4 w-4" />
                                         Manage Permissions
                                     </DropdownMenuItem>
+                                    {currentUser?.isPlatformAdmin && !user.companyId && (
+                                        <DropdownMenuItem onClick={() => handleOpenAssignCompanyDialog(user)}>
+                                            <Building2 className="mr-2 h-4 w-4" />
+                                            Assign to Company
+                                        </DropdownMenuItem>
+                                    )}
                                     <DropdownMenuItem
                                         onClick={() => handleOpenReassignDialog(user)}
                                         disabled={user.role !== 'employee' || user.status === 'inactive'}
@@ -317,6 +407,18 @@ export function UserManagementTable() {
                 }}
                 user={selectedUser}
                 onPermissionsUpdated={handleUserUpdated}
+            />
+        )}
+        {selectedUser && currentUser?.isPlatformAdmin && (
+            <AssignCompanyDialog
+                isOpen={isAssignCompanyDialogOpen}
+                onClose={() => {
+                    setIsAssignCompanyDialogOpen(false);
+                    setSelectedUser(null);
+                }}
+                user={selectedUser}
+                companies={companies}
+                onAssign={handleAssignCompany}
             />
         )}
         <AlertDialog open={isDeactivateConfirmOpen} onOpenChange={setIsDeactivateConfirmOpen}>

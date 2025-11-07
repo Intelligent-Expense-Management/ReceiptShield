@@ -47,7 +47,7 @@ export function ManagePermissionsDialog({
   const { user: currentUser } = useAuth();
   const [role, setRole] = useState<UserRole>('employee');
   const [status, setStatus] = useState<'active' | 'inactive'>('active');
-  const [supervisorId, setSupervisorId] = useState<string>('');
+  const [supervisorId, setSupervisorId] = useState<string>('none');
   const [canManageSubscription, setCanManageSubscription] = useState(false);
   const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
   const [managers, setManagers] = useState<User[]>([]);
@@ -60,7 +60,7 @@ export function ManagePermissionsDialog({
     if (user) {
       setRole(user.role || 'employee');
       setStatus(user.status === 'active' ? 'active' : 'inactive');
-      setSupervisorId(user.supervisorId || '');
+      setSupervisorId(user.supervisorId || 'none');
       setCanManageSubscription(user.canManageSubscription || false);
       setIsPlatformAdmin(user.isPlatformAdmin || false);
       loadManagers();
@@ -102,7 +102,7 @@ export function ManagePermissionsDialog({
 
       // Handle supervisor assignment (only for employees)
       if (role === 'employee') {
-        updates.supervisorId = supervisorId || undefined;
+        updates.supervisorId = supervisorId === 'none' ? undefined : supervisorId;
       } else {
         // Clear supervisor if role is changed from employee
         updates.supervisorId = undefined;
@@ -155,7 +155,7 @@ export function ManagePermissionsDialog({
     setRole(newRole);
     // If changing from employee, clear supervisor
     if (newRole !== 'employee') {
-      setSupervisorId('');
+      setSupervisorId('none');
     }
   };
 
@@ -274,7 +274,7 @@ export function ManagePermissionsDialog({
                     <SelectValue placeholder={managers.length === 0 ? "No managers available" : "Select a supervisor"} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">None</SelectItem>
+                    <SelectItem value="none">None</SelectItem>
                     {managers.map((manager) => (
                       <SelectItem key={manager.id} value={manager.id}>
                         {manager.name} ({manager.email})

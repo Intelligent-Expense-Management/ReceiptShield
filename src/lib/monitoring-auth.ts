@@ -33,14 +33,20 @@ export function getMonitoringUser(request: NextRequest): MonitoringUser | null {
     // Check for Bearer token (for user authentication)
     if (authHeader?.startsWith('Bearer ')) {
       const token = authHeader.substring(7);
-      // In real implementation, verify JWT token here
-      // For demo, we'll accept any token and return a mock admin user
-      return {
-        id: 'admin-1',
-        role: 'admin',
-        email: 'admin@receiptshield.com',
-        name: 'Admin User'
-      };
+      try {
+        // Verify Firebase ID token
+        const { auth } = await import('./firebase-admin');
+        const decodedToken = await auth.verifyIdToken(token);
+        return {
+          id: decodedToken.uid,
+          role: (decodedToken.role as 'admin' | 'manager' | 'employee') || 'employee',
+          email: decodedToken.email || 'unknown@receiptshield.com',
+          name: decodedToken.name || decodedToken.email?.split('@')[0] || 'User'
+        };
+      } catch (error) {
+        console.error('Failed to verify monitoring auth token:', error);
+        return null; // Invalid token
+      }
     }
 
     return null;

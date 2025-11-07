@@ -9,8 +9,9 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/contexts/auth-context";
 import { Chatbot } from "@/components/shared/chatbot";
-import { getAllReceipts } from "@/lib/receipt-store";
-import { getReceiptsForManager } from "@/lib/receipt-store";
+import { getAllReceipts, getReceiptsBySupervisor } from "@/lib/firebase-receipt-store";
+import { getUnreadNotificationCount } from "@/lib/firebase-notification-store";
+import { getCompany } from "@/lib/firebase-company-store";
 import {
   Home,
   ReceiptText,
@@ -62,6 +63,7 @@ export function ModernSidebar({
   const { user, logout } = useAuth();
   const [fraudAlertsCount, setFraudAlertsCount] = useState<number | null>(null);
   const [notificationsCount, setNotificationsCount] = useState<number | null>(null);
+  const [companyName, setCompanyName] = useState<string | null>(null);
 
   const handleThemeChange = (newTheme: 'light' | 'dark' | 'system') => {
     setTheme(newTheme);
@@ -97,6 +99,24 @@ export function ModernSidebar({
     }
   }, []);
 
+  // Load company name
+  useEffect(() => {
+    const fetchCompanyName = async () => {
+      if (user?.companyId) {
+        try {
+          const company = await getCompany(user.companyId);
+          if (company) {
+            setCompanyName(company.name);
+          }
+        } catch (error) {
+          console.error('Error fetching company name:', error);
+        }
+      }
+    };
+
+    fetchCompanyName();
+  }, [user?.companyId]);
+
   // Load fraud alerts and notifications counts
   useEffect(() => {
     const loadCounts = async () => {
@@ -110,7 +130,7 @@ export function ModernSidebar({
           const fraudCount = allReceipts.filter(r => r.isFraudulent).length;
           setFraudAlertsCount(fraudCount);
         } else if (userRole === 'manager') {
-          const managerReceipts = await getReceiptsForManager(user.id);
+          const managerReceipts = await getReceiptsBySupervisor(user.id, user.companyId);
           const fraudCount = managerReceipts.filter(r => r.isFraudulent).length;
           setFraudAlertsCount(fraudCount);
         } else {
@@ -118,25 +138,15 @@ export function ModernSidebar({
           setFraudAlertsCount(null);
         }
 
-        // Load notifications count (pending approvals, etc.)
-        let notificationCount = 0;
-        if (userRole === 'manager') {
-          const managerReceipts = await getReceiptsForManager(user.id);
-          notificationCount = managerReceipts.filter(r => r.status === 'pending_approval').length;
-        } else if (userRole === 'employee') {
-          const companyId = user.companyId;
-          const allReceipts = await getAllReceipts(undefined, companyId);
-          const userReceipts = allReceipts.filter(r => r.uploadedBy === user.email);
-          notificationCount = userReceipts.filter(r => 
-            r.status === 'pending_approval' || 
-            (r.status === 'draft' && r.managerNotes?.includes('Request for more information'))
-          ).length;
-        } else if (userRole === 'admin') {
-          const companyId = user.isPlatformAdmin ? undefined : user.companyId;
-          const allReceipts = await getAllReceipts(undefined, companyId);
-          notificationCount = allReceipts.filter(r => r.status === 'pending_approval').length;
+        // Load unread notifications count from Firestore
+        try {
+          const userId = user.email || user.id || '';
+          const unreadCount = await getUnreadNotificationCount(userId, user.companyId);
+          setNotificationsCount(unreadCount);
+        } catch (error) {
+          console.error('Error loading unread notification count:', error);
+          setNotificationsCount(0);
         }
-        setNotificationsCount(notificationCount);
       } catch (error) {
         console.error('Error loading notification counts:', error);
         setFraudAlertsCount(0);
@@ -236,6 +246,12 @@ export function ModernSidebar({
             icon: Users,
             badge: null
           },
+          ...(user?.isPlatformAdmin ? [{
+            href: `${basePath}/check-user`,
+            label: "Check User Company",
+            icon: Building2,
+            badge: null
+          }] : []),
           {
             href: `${basePath}/analytics`,
             label: "Organization Analytics",
@@ -420,6 +436,16 @@ export function ModernSidebar({
           </button>
         </div>
 
+        {/* Company Name Badge */}
+        {companyName && !isCollapsed && (
+          <div className="px-3 pt-3 pb-2">
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/10 border border-primary/20">
+              <Building2 className="h-4 w-4 text-primary flex-shrink-0" />
+              <span className="text-sm font-semibold text-primary truncate">{companyName}</span>
+            </div>
+          </div>
+        )}
+
         {/* Navigation */}
         <nav className="flex-1 px-3 py-4 space-y-1">
           {navigationItems.map((item) => (
@@ -536,6 +562,12 @@ export function ModernSidebar({
                   <p className="text-xs text-[var(--color-text-secondary)] truncate capitalize">
                     {user.role}
                   </p>
+                  {companyName && (
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <Building2 className="h-3 w-3 text-primary flex-shrink-0" />
+                      <p className="text-xs font-medium text-primary truncate">{companyName}</p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

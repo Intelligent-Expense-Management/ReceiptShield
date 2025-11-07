@@ -12,13 +12,33 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { UserCircle, Shield, UserCog, KeyRound, ChevronDown, Bell, Bot, LogOut } from 'lucide-react';
+import { UserCircle, Shield, UserCog, KeyRound, ChevronDown, Bell, Bot, LogOut, Building2 } from 'lucide-react';
 import Link from 'next/link';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { ThemeToggle } from '@/components/shared/theme-toggle';
+import { useState, useEffect } from 'react';
+import { getCompany } from '@/lib/firebase-company-store';
 
 export default function AppHeader({ onChatbotClick }: { onChatbotClick?: () => void }) {
   const { user, logout } = useAuth();
+  const [companyName, setCompanyName] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchCompanyName = async () => {
+      if (user?.companyId) {
+        try {
+          const company = await getCompany(user.companyId);
+          if (company) {
+            setCompanyName(company.name);
+          }
+        } catch (error) {
+          console.error('Error fetching company name:', error);
+        }
+      }
+    };
+
+    fetchCompanyName();
+  }, [user?.companyId]);
 
   return (
     <header className="bg-card/80 backdrop-blur-sm border-b border-border sticky top-0 z-40">
@@ -29,6 +49,12 @@ export default function AppHeader({ onChatbotClick }: { onChatbotClick?: () => v
             <Shield className="w-7 h-7" />
             <span className="hidden sm:inline">Receipt Shield</span>
           </Link>
+          {companyName && (
+            <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary/10 border border-primary/20">
+              <Building2 className="h-4 w-4 text-primary" />
+              <span className="text-sm font-medium text-primary">{companyName}</span>
+            </div>
+          )}
         </div>
         
         {user && (
@@ -58,7 +84,7 @@ export default function AppHeader({ onChatbotClick }: { onChatbotClick?: () => v
                   <div className="text-left hidden md:block">
                     <p className="text-sm font-medium leading-none">{user.name || 'User'}</p>
                     <p className="text-xs leading-none text-muted-foreground">
-                      {user.role}
+                      {companyName ? `${companyName} • ${user.role}` : user.role}
                     </p>
                   </div>
                   <ChevronDown className="h-4 w-4 text-muted-foreground hidden md:block" />
@@ -71,6 +97,12 @@ export default function AppHeader({ onChatbotClick }: { onChatbotClick?: () => v
                     <p className="text-xs leading-none text-muted-foreground">
                       {user.email}
                     </p>
+                    {companyName && (
+                      <div className="flex items-center gap-1.5 mt-1 pt-1 border-t border-border">
+                        <Building2 className="h-3.5 w-3.5 text-primary" />
+                        <p className="text-xs font-medium text-primary">{companyName}</p>
+                      </div>
+                    )}
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
