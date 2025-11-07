@@ -391,11 +391,26 @@ Be thorough but fair. Only flag as fraudulent if you identify clear indicators.`
       });
     }
 
+    // Clean up the response - remove markdown code blocks if present
+    let cleanedResponse = aiTextResponse.trim();
+    
+    // Remove markdown code block markers (```json and ```)
+    cleanedResponse = cleanedResponse.replace(/^```json\s*/i, '');
+    cleanedResponse = cleanedResponse.replace(/^```\s*/i, '');
+    cleanedResponse = cleanedResponse.replace(/\s*```$/i, '');
+    cleanedResponse = cleanedResponse.trim();
+    
+    // Try to extract JSON if it's embedded in other text
+    const jsonMatch = cleanedResponse.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      cleanedResponse = jsonMatch[0];
+    }
+    
     let aiResult: any;
     try {
-      aiResult = JSON.parse(aiTextResponse);
+      aiResult = JSON.parse(cleanedResponse);
     } catch (parseError) {
-      console.warn("⚠️ Could not parse Gemini response as JSON", aiTextResponse, parseError);
+      console.warn("⚠️ Could not parse Gemini response as JSON", cleanedResponse.substring(0, 500), parseError);
       return NextResponse.json({
         fraudulent: false,
         fraudProbability: 0.1,
@@ -404,7 +419,7 @@ Be thorough but fair. Only flag as fraudulent if you identify clear indicators.`
         riskFactors: [],
         confidence: 0.4,
         error: "INVALID_JSON",
-        rawResponse: aiTextResponse,
+        rawResponse: aiTextResponse.substring(0, 500), // Only log first 500 chars
       });
     }
 
