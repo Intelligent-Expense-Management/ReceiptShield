@@ -140,7 +140,7 @@ Be thorough but fair. Only flag as fraudulent if you identify clear indicators.`
       }
     }
 
-    const requestBody = {
+    const geminiRequestBody = {
       contents: [
         {
           role: "user",        // <-- include role
@@ -173,7 +173,7 @@ Be thorough but fair. Only flag as fraudulent if you identify clear indicators.`
         },
         // Avoid edge caches if any proxy is in front (optional)
         cache: "no-store",
-        body: JSON.stringify(requestBody),
+        body: JSON.stringify(geminiRequestBody),
         signal: controller.signal,
       });
       clearTimeout(timeoutId);
