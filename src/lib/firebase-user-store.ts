@@ -238,7 +238,7 @@ export async function addUser(user: Omit<User, 'id' | 'createdAt' | 'updatedAt'>
     }
 
     // Remove any undefined or null values that might cause issues (but keep companyId even if null for filtering)
-    const cleanUserData = Object.fromEntries(
+    const cleanUserData: any = Object.fromEntries(
       Object.entries(userData).filter(([key, value]) => {
         // Keep companyId even if null/undefined for proper filtering
         if (key === 'companyId') return true;
@@ -258,8 +258,9 @@ export async function addUser(user: Omit<User, 'id' | 'createdAt' | 'updatedAt'>
     // If UID is provided, use it as the document ID (for Firebase Auth users)
     // Otherwise, generate a new document ID
     let userId: string;
-    if (cleanUserData.uid) {
-      userId = cleanUserData.uid;
+    const uidValue = cleanUserData.uid as string | undefined;
+    if (uidValue && uidValue.trim() !== '') {
+      userId = uidValue;
       const userRef = doc(db, USERS_COLLECTION, userId);
       await setDoc(userRef, cleanUserData);
       console.log('User added successfully with UID as document ID:', userId);
