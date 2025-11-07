@@ -54,16 +54,66 @@ export async function POST(request: NextRequest) {
     
     console.log("✅ API key found, length:", apiKey.length);
 
+    // First, try to list available models to see what we have access to
+    let availableModels: string[] = [];
+    try {
+      console.log("🔍 Checking available models...");
+      const listModelsUrl = "https://generativelanguage.googleapis.com/v1beta/models";
+      const listResponse = await fetch(listModelsUrl, {
+        method: "GET",
+        headers: {
+          "X-Goog-Api-Key": apiKey,
+        },
+      });
+      
+      if (listResponse.ok) {
+        const modelsData = await listResponse.json();
+        availableModels = (modelsData.models || []).map((m: any) => m.name).filter((name: string) => 
+          name && (name.includes("gemini") || name.includes("models/"))
+        );
+        console.log("✅ Available models:", availableModels.slice(0, 5).join(", "));
+      } else {
+        console.warn("⚠️ Could not list models, will try defaults");
+      }
+    } catch (listError) {
+      console.warn("⚠️ Error listing models:", listError);
+    }
+
     // Prepare receipt data text
     const receiptText =
       Array.isArray(items)
         ? items.map((it: any) => `${it?.label ?? "field"}: ${it?.value ?? ""}`).join("\n")
         : "";
 
-    // Use v1beta with gemini-1.5-pro (most current and stable model)
-    // Fallback to gemini-1.5-flash if pro is not available
-    const preferredModel = process.env.GEMINI_MODEL || "gemini-1.5-pro";
-    const apiVersion = process.env.GEMINI_API_VERSION || "v1beta";
+    // Determine which model to use - check available models first, then fallback to defaults
+    let preferredModel = process.env.GEMINI_MODEL;
+    let apiVersion = process.env.GEMINI_API_VERSION || "v1beta";
+    
+    // If we got available models, try to find a suitable one
+    if (availableModels.length > 0) {
+      // Look for gemini-1.5-pro or gemini-1.5-flash first
+      const preferred = availableModels.find(m => m.includes("gemini-1.5-pro") || m.includes("1.5-pro"));
+      const flash = availableModels.find(m => m.includes("gemini-1.5-flash") || m.includes("1.5-flash"));
+      const anyGemini = availableModels.find(m => m.includes("gemini"));
+      
+      if (preferred) {
+        preferredModel = preferred.replace("models/", "").split("/").pop() || preferred;
+      } else if (flash) {
+        preferredModel = flash.replace("models/", "").split("/").pop() || flash;
+      } else if (anyGemini) {
+        preferredModel = anyGemini.replace("models/", "").split("/").pop() || anyGemini;
+        console.log(`⚠️ Using available model: ${preferredModel}`);
+      }
+    }
+    
+    // Default fallback if no model found
+    if (!preferredModel) {
+      preferredModel = "gemini-1.5-pro";
+    }
+    
+    // Clean up model name (remove "models/" prefix if present)
+    preferredModel = preferredModel.replace(/^models\//, "");
+    
     const apiUrl = `https://generativelanguage.googleapis.com/${apiVersion}/models/${preferredModel}:generateContent`;
     console.log(`🔧 Using Gemini API: ${apiVersion}/models/${preferredModel}`);
 
