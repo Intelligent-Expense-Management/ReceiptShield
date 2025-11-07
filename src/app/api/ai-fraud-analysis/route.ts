@@ -60,8 +60,11 @@ export async function POST(request: NextRequest) {
         ? items.map((it: any) => `${it?.label ?? "field"}: ${it?.value ?? ""}`).join("\n")
         : "";
 
-    const model = process.env.GEMINI_MODEL || "gemini-1.5-flash"; // safer generally-available default
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+    // Try v1 API first with gemini-pro (most stable), fallback to v1beta with gemini-1.5-flash if needed
+    const preferredModel = process.env.GEMINI_MODEL || "gemini-pro";
+    const apiVersion = process.env.GEMINI_API_VERSION || "v1";
+    const apiUrl = `https://generativelanguage.googleapis.com/${apiVersion}/models/${preferredModel}:generateContent`;
+    console.log(`🔧 Using Gemini API: ${apiVersion}/models/${preferredModel}`);
 
     const parts: any[] = [
       { text: `You are an expert fraud detection analyst specializing in expense receipt analysis. Analyze the following receipt data and determine if there are any indicators of fraud or suspicious activity.
@@ -216,32 +219,68 @@ Be thorough but fair. Only flag as fraudulent if you identify clear indicators.`
         errorData = { error: { message: errorText } };
       }
 
-      if (geminiResponse.status === 429) {
-        console.warn("⚠️ Gemini API rate limit exceeded (429)");
-        return NextResponse.json({
-          fraudulent: false,
-          fraudProbability: 0.1,
-          explanation:
-            "AI analysis temporarily unavailable: Google Gemini API rate limit exceeded. Please try again in a few moments.",
-          riskFactors: [],
-          confidence: 0.3,
-          error: "RATE_LIMIT_EXCEEDED",
-          retryAfter: "Please wait a few minutes before trying again",
-        });
+      // If model not found, try fallback: v1beta with gemini-1.5-flash
+      if (geminiResponse.status === 404 && errorData?.error?.message?.includes("not found")) {
+        console.warn("⚠️ Primary model not found, trying fallback: v1beta/gemini-1.5-flash");
+        try {
+          const fallbackUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent`;
+          const fallbackController = new AbortController();
+          const fallbackTimeout = setTimeout(() => fallbackController.abort(), 60000);
+          
+          const fallbackResponse = await fetch(fallbackUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Goog-Api-Key": apiKey,
+            },
+            cache: "no-store",
+            body: JSON.stringify(geminiRequestBody),
+            signal: fallbackController.signal,
+          });
+          
+          clearTimeout(fallbackTimeout);
+          
+          if (fallbackResponse.ok) {
+            console.log("✅ Fallback model worked!");
+            geminiResponse = fallbackResponse;
+          } else {
+            throw new Error("Fallback also failed");
+          }
+        } catch (fallbackError) {
+          console.error("❌ Fallback model also failed:", fallbackError);
+          // Continue to error handling below
+        }
       }
 
-      console.error("❌ Gemini API error:", errorText);
-      return NextResponse.json(
-        {
-          fraudulent: false,
-          fraudProbability: 0.1,
-          explanation: `AI analysis unavailable: ${errorData?.error?.message || "Unknown Gemini API error"}. The receipt will be processed with ML analysis only.`,
-          riskFactors: [],
-          confidence: 0.4,
-          error: errorData?.error?.status || "GEMINI_API_ERROR",
-        },
-        { status: 502 }
-      );
+      // If still not ok after fallback attempt, return error
+      if (!geminiResponse.ok) {
+        if (geminiResponse.status === 429) {
+          console.warn("⚠️ Gemini API rate limit exceeded (429)");
+          return NextResponse.json({
+            fraudulent: false,
+            fraudProbability: 0.1,
+            explanation:
+              "AI analysis temporarily unavailable: Google Gemini API rate limit exceeded. Please try again in a few moments.",
+            riskFactors: [],
+            confidence: 0.3,
+            error: "RATE_LIMIT_EXCEEDED",
+            retryAfter: "Please wait a few minutes before trying again",
+          });
+        }
+
+        console.error("❌ Gemini API error:", errorText);
+        return NextResponse.json(
+          {
+            fraudulent: false,
+            fraudProbability: 0.1,
+            explanation: `AI analysis unavailable: ${errorData?.error?.message || "Unknown Gemini API error"}. The receipt will be processed with ML analysis only.`,
+            riskFactors: [],
+            confidence: 0.4,
+            error: errorData?.error?.status || "GEMINI_API_ERROR",
+          },
+          { status: 502 }
+        );
+      }
     }
 
     const geminiData = await geminiResponse.json();
