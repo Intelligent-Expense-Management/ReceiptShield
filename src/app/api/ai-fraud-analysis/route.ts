@@ -9,7 +9,7 @@ export async function POST(request: NextRequest) {
     const { items, imageUrl, receiptData } = await request.json();
     console.log('🤖 AI Fraud Analysis Request received');
 
-    const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
+    const apiKey = process.env.GOOGLE_AI_API_KEY;
     
     if (!apiKey || apiKey === 'your_google_ai_api_key_here') {
       console.warn('⚠️ Google AI API key not configured');
