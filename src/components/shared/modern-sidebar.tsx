@@ -9,6 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/contexts/auth-context";
 import { Chatbot } from "@/components/shared/chatbot";
+import { getAllReceipts } from "@/lib/receipt-store";
+import { getReceiptsForManager } from "@/lib/receipt-store";
 import {
   Home,
   ReceiptText,
@@ -58,6 +60,8 @@ export function ModernSidebar({
   const [isChatbotOpen, setIsChatbotOpen] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('system');
   const { user, logout } = useAuth();
+  const [fraudAlertsCount, setFraudAlertsCount] = useState<number | null>(null);
+  const [notificationsCount, setNotificationsCount] = useState<number | null>(null);
 
   const handleThemeChange = (newTheme: 'light' | 'dark' | 'system') => {
     setTheme(newTheme);
@@ -92,6 +96,56 @@ export function ModernSidebar({
       handleThemeChange(savedTheme);
     }
   }, []);
+
+  // Load fraud alerts and notifications counts
+  useEffect(() => {
+    const loadCounts = async () => {
+      if (!user) return;
+
+      try {
+        // Load fraud alerts count for admin and manager (not for employees)
+        if (userRole === 'admin') {
+          const companyId = user.isPlatformAdmin ? undefined : user.companyId;
+          const allReceipts = await getAllReceipts(undefined, companyId);
+          const fraudCount = allReceipts.filter(r => r.isFraudulent).length;
+          setFraudAlertsCount(fraudCount);
+        } else if (userRole === 'manager') {
+          const managerReceipts = await getReceiptsForManager(user.id);
+          const fraudCount = managerReceipts.filter(r => r.isFraudulent).length;
+          setFraudAlertsCount(fraudCount);
+        } else {
+          // Employees don't have fraud alerts badge
+          setFraudAlertsCount(null);
+        }
+
+        // Load notifications count (pending approvals, etc.)
+        let notificationCount = 0;
+        if (userRole === 'manager') {
+          const managerReceipts = await getReceiptsForManager(user.id);
+          notificationCount = managerReceipts.filter(r => r.status === 'pending_approval').length;
+        } else if (userRole === 'employee') {
+          const companyId = user.companyId;
+          const allReceipts = await getAllReceipts(undefined, companyId);
+          const userReceipts = allReceipts.filter(r => r.uploadedBy === user.email);
+          notificationCount = userReceipts.filter(r => 
+            r.status === 'pending_approval' || 
+            (r.status === 'draft' && r.managerNotes?.includes('Request for more information'))
+          ).length;
+        } else if (userRole === 'admin') {
+          const companyId = user.isPlatformAdmin ? undefined : user.companyId;
+          const allReceipts = await getAllReceipts(undefined, companyId);
+          notificationCount = allReceipts.filter(r => r.status === 'pending_approval').length;
+        }
+        setNotificationsCount(notificationCount);
+      } catch (error) {
+        console.error('Error loading notification counts:', error);
+        setFraudAlertsCount(0);
+        setNotificationsCount(0);
+      }
+    };
+
+    loadCounts();
+  }, [user, userRole]);
 
   const getNavigationItems = () => {
     const basePath = userRole === "employee" ? "/employee" : 
@@ -157,7 +211,7 @@ export function ModernSidebar({
             href: `${basePath}/fraud-alerts`,
             label: "Fraud Alerts",
             icon: ShieldAlert,
-            badge: 3
+            badge: fraudAlertsCount
           }
         ];
       
@@ -199,7 +253,7 @@ export function ModernSidebar({
             href: `${basePath}/fraud-alerts`,
             label: "Fraud Detection",
             icon: ShieldAlert,
-            badge: 5
+            badge: fraudAlertsCount
           }
         ];
         return adminItems;
@@ -224,7 +278,7 @@ export function ModernSidebar({
       href: "/notifications",
       label: "Notifications",
       icon: Bell,
-      badge: 5
+      badge: notificationsCount
     },
     // Show subscription link for company owners or users with subscription management permission
     ...(user && (user.isCompanyOwner || user.canManageSubscription) ? [{
