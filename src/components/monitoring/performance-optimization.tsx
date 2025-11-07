@@ -50,15 +50,16 @@ export function PerformanceOptimization() {
         healthResponse.json()
       ]);
 
-      // Generate performance metrics (in a real app, these would come from system monitoring)
+      // Generate performance metrics from health data where available
+      // TODO: Replace with real system monitoring data (e.g., from Cloud Monitoring, New Relic, etc.)
       const performanceMetrics: PerformanceMetrics = {
-        cpuUsage: Math.floor(Math.random() * 40) + 20, // 20-60%
-        memoryUsage: Math.floor(Math.random() * 30) + 40, // 40-70%
-        diskUsage: Math.floor(Math.random() * 20) + 30, // 30-50%
-        networkLatency: healthData.responseTime || Math.floor(Math.random() * 50) + 50,
-        databaseConnections: Math.floor(Math.random() * 20) + 5,
-        cacheHitRate: Math.floor(Math.random() * 20) + 75, // 75-95%
-        slowQueries: Math.floor(Math.random() * 5),
+        cpuUsage: healthData.cpuUsage || 0, // TODO: Get from system monitoring
+        memoryUsage: healthData.memoryUsage || 0, // TODO: Get from system monitoring
+        diskUsage: healthData.diskUsage || 0, // TODO: Get from system monitoring
+        networkLatency: healthData.responseTime || 0, // Use response time as network latency proxy
+        databaseConnections: healthData.databaseConnections || 0, // TODO: Get from database monitoring
+        cacheHitRate: healthData.cacheHitRate || 0, // TODO: Get from cache monitoring
+        slowQueries: healthData.slowQueries || 0, // TODO: Get from database query logs
         recommendations: [
           {
             id: '1',

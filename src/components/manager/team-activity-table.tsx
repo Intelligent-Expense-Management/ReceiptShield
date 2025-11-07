@@ -39,7 +39,7 @@ export function TeamActivityTable() {
             return;
         }
 
-        const teamMembers = await getEmployeesForManager(user.id);
+        const teamMembers = await getEmployeesForManager(user.id, user.companyId);
         
         // Load receipts for all team members
         const receiptPromises = teamMembers.map(async (employee) => {

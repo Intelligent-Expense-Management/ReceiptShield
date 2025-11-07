@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -23,35 +23,52 @@ export default function SubscriptionPage() {
   const [usageInfo, setUsageInfo] = useState<any>(null);
   const [subscriptionStatus, setSubscriptionStatus] = useState<any>(null);
 
-  useEffect(() => {
-    if (!user?.companyId) {
-      router.push('/settings');
+  const loadSubscriptionData = useCallback(async () => {
+    if (!user?.companyId || user.companyId.trim() === '') {
+      console.warn('User does not have a companyId');
+      setLoading(false);
       return;
     }
 
-    loadSubscriptionData();
-  }, [user, router]);
-
-  const loadSubscriptionData = async () => {
-    if (!user?.companyId) return;
-
     try {
       setLoading(true);
+      console.log('Loading subscription data for companyId:', user.companyId);
+      
       const [companyData, usage, subscription] = await Promise.all([
         getCompany(user.companyId),
         getCompanyUsageInfo(user.companyId),
         hasActiveSubscription(user.companyId),
       ]);
 
+      console.log('Subscription data loaded:', {
+        hasCompany: !!companyData,
+        hasUsage: !!usage,
+        hasSubscription: !!subscription
+      });
+
       setCompany(companyData);
       setUsageInfo(usage);
       setSubscriptionStatus(subscription);
     } catch (error) {
       console.error('Error loading subscription data:', error);
+      // Set error state so user sees the error message
+      setCompany(null);
+      setUsageInfo(null);
+      setSubscriptionStatus(null);
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.companyId]);
+
+  useEffect(() => {
+    if (!user?.companyId || user.companyId.trim() === '') {
+      router.push('/settings');
+      return;
+    }
+
+    loadSubscriptionData();
+  }, [user, router, loadSubscriptionData]);
+
 
   const handleSelectPlan = async (plan: SubscriptionPlanKey) => {
     if (!user?.companyId || !user.email) return;
@@ -128,9 +145,18 @@ export default function SubscriptionPage() {
         <Alert>
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
-            Unable to load subscription information. Please try again later.
+            {!user?.companyId || user.companyId.trim() === '' 
+              ? 'You are not associated with a company. Please contact your administrator or create a company account.'
+              : 'Unable to load subscription information. This may be because your company account was not found or you do not have permission to view it. Please contact your administrator or try again later.'}
           </AlertDescription>
         </Alert>
+        {user?.companyId && user.companyId.trim() !== '' && (
+          <div className="mt-4">
+            <Button onClick={loadSubscriptionData} variant="outline">
+              Retry
+            </Button>
+          </div>
+        )}
       </div>
     );
   }

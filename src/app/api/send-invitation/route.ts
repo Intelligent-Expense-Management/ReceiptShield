@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createInvitation } from '@/lib/firebase-invitation-store';
 import { generateInvitationEmail } from '@/lib/email-service';
 import { sendInvitationEmail } from '@/lib/sendgrid-service';
+import { auth } from '@/lib/firebase-admin';
 
 export async function OPTIONS(request: NextRequest) {
   return new NextResponse(null, {
@@ -9,7 +10,7 @@ export async function OPTIONS(request: NextRequest) {
     headers: {
       'Access-Control-Allow-Origin': 'https://compensationengine.com',
       'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     },
   });
 }
@@ -18,16 +19,32 @@ export async function POST(request: NextRequest) {
   try {
     console.log('📧 Send invitation API called');
     
+    // Try to get authenticated user from Authorization header
+    let invitedBy = 'system-admin'; // Fallback if no auth token
+    const authHeader = request.headers.get('authorization');
+    
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      try {
+        const token = authHeader.split('Bearer ')[1];
+        const decodedToken = await auth.verifyIdToken(token);
+        // Use email as invitedBy, or uid if email is not available
+        invitedBy = decodedToken.email || decodedToken.uid;
+        console.log('📧 Authenticated user:', invitedBy);
+      } catch (authError) {
+        console.warn('📧 Failed to verify auth token, using fallback:', authError);
+        // Continue with fallback value
+      }
+    } else {
+      console.warn('📧 No authorization header found, using fallback invitedBy');
+    }
+    
     const invitationData = await request.json();
     console.log('📧 Invitation data received:', {
       email: invitationData.email,
       role: invitationData.role,
-      hasMessage: !!invitationData.message
+      hasMessage: !!invitationData.message,
+      invitedBy
     });
-
-    // For now, use a mock invitedBy user ID
-    // In a real app, this would come from authentication
-    const invitedBy = 'system-admin';
 
     // Create invitation in database (or get existing one)
     console.log('📧 Creating invitation in database...');
@@ -92,7 +109,7 @@ export async function POST(request: NextRequest) {
       headers: {
         'Access-Control-Allow-Origin': 'https://compensationengine.com',
         'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
       },
     });
   } catch (error) {
@@ -116,7 +133,7 @@ export async function POST(request: NextRequest) {
       headers: {
         'Access-Control-Allow-Origin': 'https://compensationengine.com',
         'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
       },
     });
   }

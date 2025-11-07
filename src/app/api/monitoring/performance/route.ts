@@ -6,7 +6,7 @@ import { requireMonitoringAuth, logMonitoringAccess } from '@/lib/monitoring-aut
 export async function GET(request: NextRequest) {
   try {
     // Require authentication for monitoring access
-    const user = requireMonitoringAuth(request);
+    const user = await requireMonitoringAuth(request);
     logMonitoringAccess(user, '/api/monitoring/performance', 'GET');
     // Fetch performance metrics from last 24 hours
     const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);

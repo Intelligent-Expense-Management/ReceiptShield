@@ -34,12 +34,24 @@ export async function testFirebaseConnection(): Promise<boolean> {
 }
 
 // Initialize default users in Firestore
+// NOTE: This function creates mock users for development/testing only.
+// In production, users should be created through the signup flow or invitation system.
+// Set ENABLE_MOCK_USERS=true in environment variables to enable this feature.
 export async function initializeDefaultUsers(): Promise<void> {
+  // Only run in development or if explicitly enabled
+  const enableMockUsers = process.env.ENABLE_MOCK_USERS === 'true' || process.env.NODE_ENV === 'development';
+  
+  if (!enableMockUsers) {
+    console.log('Mock user initialization is disabled. Set ENABLE_MOCK_USERS=true to enable.');
+    return;
+  }
+
   try {
     const usersSnapshot = await getDocs(collection(db, USERS_COLLECTION));
     
     // Only initialize if no users exist
     if (usersSnapshot.empty) {
+      console.warn('⚠️  Initializing mock users. This should only happen in development!');
       const now = new Date();
       
       // Create admin first
@@ -91,7 +103,7 @@ export async function initializeDefaultUsers(): Promise<void> {
       for (const employee of employees) {
         await addDoc(collection(db, USERS_COLLECTION), employee);
       }
-      console.log('Default users initialized in Firestore with proper relationships');
+      console.log('⚠️  Mock users initialized in Firestore. This should not happen in production!');
     }
   } catch (error) {
     console.error('Error initializing default users:', error);
@@ -339,13 +351,22 @@ export async function getManagers(companyId?: string): Promise<User[]> {
   }
 }
 
-export async function getEmployeesForManager(managerId: string): Promise<User[]> {
+export async function getEmployeesForManager(managerId: string, companyId?: string): Promise<User[]> {
   try {
-    const q = query(
-      collection(db, USERS_COLLECTION),
+    const constraints = [
       where('role', '==', 'employee'),
       where('supervisorId', '==', managerId),
       where('status', '==', 'active')
+    ];
+    
+    // Add company filter if provided (for multi-tenant isolation)
+    if (companyId) {
+      constraints.push(where('companyId', '==', companyId));
+    }
+    
+    const q = query(
+      collection(db, USERS_COLLECTION),
+      ...constraints
     );
     const querySnapshot = await getDocs(q);
     const employees: User[] = [];
@@ -359,6 +380,7 @@ export async function getEmployeesForManager(managerId: string): Promise<User[]>
         email: data.email,
         role: data.role,
         status: data.status,
+        companyId: data.companyId,
         supervisorId: data.supervisorId,
         createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : data.createdAt,
         updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : data.updatedAt,
