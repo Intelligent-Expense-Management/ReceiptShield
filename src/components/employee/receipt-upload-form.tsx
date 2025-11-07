@@ -273,30 +273,55 @@ export default function ReceiptUploadForm() {
         try {
           console.log('🤖 Calling AI fraud analysis API...');
           
-          const aiResponse = await fetch('/api/ai-fraud-analysis', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              items: ocrResult.extractedItems || [],
-              imageUrl: uploadResult.url,
-              receiptData: receiptDataForAnalysis
-            })
-          });
+          // Add timeout to prevent hanging on 502 errors
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+          
+          try {
+            const aiResponse = await fetch('/api/ai-fraud-analysis', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                items: ocrResult.extractedItems || [],
+                imageUrl: uploadResult.url,
+                receiptData: receiptDataForAnalysis
+              }),
+              signal: controller.signal
+            });
 
-          if (aiResponse.ok) {
-            const aiData = await aiResponse.json();
-            aiDetection = {
-              fraudulent: aiData.fraudulent || false,
-              fraudProbability: aiData.fraudProbability || 0.1,
-              explanation: aiData.explanation || 'AI analysis completed. No fraud indicators detected.',
-              riskFactors: aiData.riskFactors || [],
-              confidence: aiData.confidence || 0.7
-            };
-            console.log('✅ AI analysis received:', aiDetection);
-          } else {
-            console.warn('⚠️ AI analysis failed:', aiResponse.status);
+            clearTimeout(timeoutId);
+
+            if (aiResponse.ok) {
+              const aiData = await aiResponse.json();
+              aiDetection = {
+                fraudulent: aiData.fraudulent || false,
+                fraudProbability: aiData.fraudProbability || 0.1,
+                explanation: aiData.explanation || 'AI analysis completed. No fraud indicators detected.',
+                riskFactors: aiData.riskFactors || [],
+                confidence: aiData.confidence || 0.7
+              };
+              console.log('✅ AI analysis received:', aiDetection);
+            } else {
+              console.warn('⚠️ AI analysis failed:', aiResponse.status);
+              // Fallback if AI analysis fails
+              aiDetection = {
+                fraudulent: false,
+                fraudProbability: 0.1,
+                explanation: 'AI analysis was not available at the time of processing. Receipt will be reviewed manually.',
+                riskFactors: [],
+                confidence: 0.3
+              };
+            }
+          } catch (fetchError: any) {
+            clearTimeout(timeoutId);
+            // Handle network errors, timeouts, and 502 errors
+            if (fetchError.name === 'AbortError') {
+              console.warn('⚠️ AI analysis timed out after 30 seconds');
+            } else {
+              console.warn('⚠️ AI analysis network error:', fetchError);
+            }
             // Fallback if AI analysis fails
             aiDetection = {
               fraudulent: false,
@@ -319,8 +344,8 @@ export default function ReceiptUploadForm() {
         }
       })();
 
-      // Wait for both analyses to complete
-      await Promise.all([mlPromise, aiPromise]);
+      // Wait for both analyses to complete (use allSettled to continue even if one fails)
+      await Promise.allSettled([mlPromise, aiPromise]);
 
       // Determine overall fraud status based on both ML and AI analysis
       const mlSaysFraud = mlPrediction?.is_fraudulent || false;

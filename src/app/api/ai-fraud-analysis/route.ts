@@ -5,18 +5,45 @@ export const runtime = "nodejs"; // ensure Buffer is available (optional but saf
 
 export async function POST(request: NextRequest) {
   try {
-    const { items, imageUrl, receiptData } = await request.json();
     console.log("🤖 AI Fraud Analysis Request received");
+    
+    let requestBody;
+    try {
+      requestBody = await request.json();
+    } catch (parseError) {
+      console.error("❌ Failed to parse request body:", parseError);
+      return NextResponse.json(
+        {
+          fraudulent: false,
+          fraudProbability: 0.1,
+          explanation: "Invalid request format. The receipt will be processed with ML analysis only.",
+          riskFactors: [],
+          confidence: 0.3,
+          error: "INVALID_REQUEST",
+        },
+        { status: 400 }
+      );
+    }
+    
+    const { items, imageUrl, receiptData } = requestBody;
+    console.log("📋 Request data:", {
+      itemsCount: Array.isArray(items) ? items.length : 0,
+      hasImageUrl: !!imageUrl,
+      hasReceiptData: !!receiptData,
+    });
 
-    const apiKey = process.env.GOOGLE_AI_API_KEY;
+    // Check for API key in both possible environment variable names
+    const apiKey = process.env.GOOGLE_AI_API_KEY || process.env.GOOGLE_API_KEY;
     if (!apiKey || apiKey === "your_google_ai_api_key_here") {
       console.warn("⚠️ Google AI API key not configured");
+      console.warn("⚠️ Checked GOOGLE_AI_API_KEY:", process.env.GOOGLE_AI_API_KEY ? "exists" : "not set");
+      console.warn("⚠️ Checked GOOGLE_API_KEY:", process.env.GOOGLE_API_KEY ? "exists" : "not set");
       return NextResponse.json(
         {
           fraudulent: false,
           fraudProbability: 0.1,
           explanation:
-            "AI analysis unavailable: Google Gemini API key not configured. Please set GOOGLE_AI_API_KEY environment variable.",
+            "AI analysis unavailable: Google Gemini API key not configured. Please set GOOGLE_AI_API_KEY or GOOGLE_API_KEY environment variable.",
           error: "API_KEY_NOT_CONFIGURED",
           riskFactors: [],
           confidence: 0.7,
@@ -24,6 +51,8 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
+    
+    console.log("✅ API key found, length:", apiKey.length);
 
     // Prepare receipt data text
     const receiptText =
@@ -72,17 +101,42 @@ Be thorough but fair. Only flag as fraudulent if you identify clear indicators.`
     // If image URL is provided, include it correctly
     if (imageUrl && !imageUrl.startsWith("data:")) {
       try {
-        const imageResponse = await fetch(imageUrl);
-        const imageBuffer = await imageResponse.arrayBuffer();
-        const imageBase64 = Buffer.from(imageBuffer).toString("base64");
-        parts.push({
-          inlineData: {
-            mimeType: imageResponse.headers.get("content-type") || "image/jpeg",
-            data: imageBase64,
-          },
+        console.log("📸 Fetching image for analysis:", imageUrl);
+        // Add timeout for image fetch
+        const imageController = new AbortController();
+        const imageTimeout = setTimeout(() => imageController.abort(), 10000); // 10 second timeout
+        
+        const imageResponse = await fetch(imageUrl, {
+          signal: imageController.signal,
         });
-      } catch (e) {
-        console.warn("⚠️ Could not include image in analysis:", e);
+        clearTimeout(imageTimeout);
+        
+        if (!imageResponse.ok) {
+          console.warn(`⚠️ Image fetch returned ${imageResponse.status}, skipping image in analysis`);
+        } else {
+          const imageBuffer = await imageResponse.arrayBuffer();
+          const imageBase64 = Buffer.from(imageBuffer).toString("base64");
+          const contentType = imageResponse.headers.get("content-type") || "image/jpeg";
+          
+          // Check image size (Gemini has limits)
+          if (imageBuffer.byteLength > 20 * 1024 * 1024) { // 20MB limit
+            console.warn("⚠️ Image too large for Gemini API, skipping image in analysis");
+          } else {
+            parts.push({
+              inlineData: {
+                mimeType: contentType,
+                data: imageBase64,
+              },
+            });
+            console.log("✅ Image included in analysis");
+          }
+        }
+      } catch (e: any) {
+        if (e.name === 'AbortError') {
+          console.warn("⚠️ Image fetch timed out, continuing without image");
+        } else {
+          console.warn("⚠️ Could not include image in analysis:", e.message || e);
+        }
       }
     }
 
@@ -102,16 +156,56 @@ Be thorough but fair. Only flag as fraudulent if you identify clear indicators.`
     };
 
     console.log("🔍 Calling Google Gemini API...");
-    const geminiResponse = await fetch(apiUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Goog-Api-Key": apiKey, // <-- send key in header
-      },
-      // Avoid edge caches if any proxy is in front (optional)
-      cache: "no-store",
-      body: JSON.stringify(requestBody),
-    });
+    
+    // Add timeout to prevent hanging requests
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+    }, 60000); // 60 second timeout for Gemini API
+    
+    let geminiResponse: Response;
+    try {
+      geminiResponse = await fetch(apiUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Goog-Api-Key": apiKey, // <-- send key in header
+        },
+        // Avoid edge caches if any proxy is in front (optional)
+        cache: "no-store",
+        body: JSON.stringify(requestBody),
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+    } catch (fetchError: any) {
+      clearTimeout(timeoutId);
+      if (fetchError.name === 'AbortError') {
+        console.error("❌ Gemini API request timed out after 60 seconds");
+        return NextResponse.json(
+          {
+            fraudulent: false,
+            fraudProbability: 0.1,
+            explanation: "AI analysis timed out. The receipt will be processed with ML analysis only.",
+            riskFactors: [],
+            confidence: 0.3,
+            error: "TIMEOUT",
+          },
+          { status: 504 } // Gateway Timeout
+        );
+      }
+      console.error("❌ Gemini API network error:", fetchError);
+      return NextResponse.json(
+        {
+          fraudulent: false,
+          fraudProbability: 0.1,
+          explanation: `AI analysis network error: ${fetchError.message || "Failed to connect to Gemini API"}. The receipt will be processed with ML analysis only.`,
+          riskFactors: [],
+          confidence: 0.3,
+          error: "NETWORK_ERROR",
+        },
+        { status: 502 }
+      );
+    }
 
     if (!geminiResponse.ok) {
       const errorText = await geminiResponse.text();
@@ -207,6 +301,13 @@ Be thorough but fair. Only flag as fraudulent if you identify clear indicators.`
     return NextResponse.json(sanitizedResult);
   } catch (error: any) {
     console.error("❌ AI Fraud Analysis failed:", error);
+    console.error("Error stack:", error?.stack);
+    console.error("Error details:", {
+      name: error?.name,
+      message: error?.message,
+      code: error?.code,
+    });
+    
     return NextResponse.json(
       {
         fraudulent: false,
@@ -215,7 +316,7 @@ Be thorough but fair. Only flag as fraudulent if you identify clear indicators.`
           `AI fraud analysis failed: ${error?.message || "Unknown error"}. The receipt will be processed with ML analysis only.`,
         riskFactors: [],
         confidence: 0.3,
-        error: error?.code || "AI_ANALYSIS_FAILED",
+        error: error?.code || error?.name || "AI_ANALYSIS_FAILED",
       },
       { status: 500 }
     );
