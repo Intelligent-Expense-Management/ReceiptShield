@@ -1,6 +1,6 @@
-import type { CapacitorConfig } from '@capacitor/cli';
-
-const config: CapacitorConfig = {
+// Capacitor configuration
+// Note: @capacitor/cli types are optional for this config file
+const config = {
   appId: 'com.receiptshield.app',
   appName: 'ReceiptShield',
   webDir: 'out',
