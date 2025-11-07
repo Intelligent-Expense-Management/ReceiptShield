@@ -228,7 +228,7 @@ Be thorough but fair. Only flag as fraudulent if you identify clear indicators.`
         temperature: 0.3,
         topK: 40,
         topP: 0.95,
-        maxOutputTokens: 1024,
+        maxOutputTokens: 4096, // Increased from 1024 to allow complete fraud analysis responses
       },
     };
 
