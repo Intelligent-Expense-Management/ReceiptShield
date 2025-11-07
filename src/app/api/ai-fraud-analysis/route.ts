@@ -373,6 +373,13 @@ Be thorough but fair. Only flag as fraudulent if you identify clear indicators.`
 
     const geminiData = await geminiResponse.json();
     const candidate = geminiData?.candidates?.[0];
+    const finishReason = candidate?.finishReason;
+    
+    // Check if response was truncated
+    if (finishReason === 'MAX_TOKENS' || finishReason === 'OTHER') {
+      console.warn(`⚠️ Gemini response may be incomplete (finishReason: ${finishReason})`);
+    }
+    
     const aiTextResponse = candidate?.content?.parts
       ?.map((part: any) => part?.text || "")
       .join("")
@@ -401,26 +408,85 @@ Be thorough but fair. Only flag as fraudulent if you identify clear indicators.`
     cleanedResponse = cleanedResponse.trim();
     
     // Try to extract JSON if it's embedded in other text
-    const jsonMatch = cleanedResponse.match(/\{[\s\S]*\}/);
+    // Use a more robust approach: find the largest valid JSON object
+    let jsonMatch = cleanedResponse.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
-      cleanedResponse = jsonMatch[0];
+      let potentialJson = jsonMatch[0];
+      
+      // Try to find complete JSON by balancing braces
+      let braceCount = 0;
+      let lastValidIndex = -1;
+      for (let i = 0; i < potentialJson.length; i++) {
+        if (potentialJson[i] === '{') braceCount++;
+        if (potentialJson[i] === '}') {
+          braceCount--;
+          if (braceCount === 0) {
+            lastValidIndex = i;
+            break;
+          }
+        }
+      }
+      
+      if (lastValidIndex > 0) {
+        cleanedResponse = potentialJson.substring(0, lastValidIndex + 1);
+      } else {
+        cleanedResponse = potentialJson;
+      }
     }
     
     let aiResult: any;
     try {
       aiResult = JSON.parse(cleanedResponse);
-    } catch (parseError) {
-      console.warn("⚠️ Could not parse Gemini response as JSON", cleanedResponse.substring(0, 500), parseError);
-      return NextResponse.json({
-        fraudulent: false,
-        fraudProbability: 0.1,
-        explanation:
-          "AI analysis unavailable: Gemini returned unstructured data. The receipt will be processed with ML analysis only.",
-        riskFactors: [],
-        confidence: 0.4,
-        error: "INVALID_JSON",
-        rawResponse: aiTextResponse.substring(0, 500), // Only log first 500 chars
-      });
+    } catch (parseError: any) {
+      // If JSON is incomplete, try to extract what we can
+      if (parseError.message?.includes('end of JSON input') || parseError.message?.includes('Unexpected')) {
+        console.warn("⚠️ Incomplete JSON response, attempting to extract partial data");
+        
+        // Try to extract partial data from incomplete JSON
+        try {
+          // Find all key-value pairs we can extract
+          const fraudulentMatch = cleanedResponse.match(/"fraudulent"\s*:\s*(true|false)/i);
+          const probabilityMatch = cleanedResponse.match(/"fraudProbability"\s*:\s*([0-9.]+)/i);
+          const explanationMatch = cleanedResponse.match(/"explanation"\s*:\s*"([^"]*)/i);
+          
+          if (fraudulentMatch || probabilityMatch) {
+            aiResult = {
+              fraudulent: fraudulentMatch ? fraudulentMatch[1].toLowerCase() === 'true' : false,
+              fraudProbability: probabilityMatch ? parseFloat(probabilityMatch[1]) : 0.5,
+              explanation: explanationMatch ? explanationMatch[1] + " (Response was truncated, analysis may be incomplete.)" : "AI analysis was truncated but indicates potential fraud concerns.",
+              riskFactors: [],
+              confidence: 0.6,
+            };
+            console.log("✅ Extracted partial data from incomplete JSON");
+          } else {
+            throw parseError; // Re-throw if we can't extract anything
+          }
+        } catch (extractError) {
+          console.warn("⚠️ Could not parse or extract from Gemini response", cleanedResponse.substring(0, 500), parseError);
+          return NextResponse.json({
+            fraudulent: false,
+            fraudProbability: 0.1,
+            explanation:
+              "AI analysis unavailable: Gemini returned incomplete or unstructured data. The receipt will be processed with ML analysis only.",
+            riskFactors: [],
+            confidence: 0.4,
+            error: "INVALID_JSON",
+            rawResponse: aiTextResponse.substring(0, 500), // Only log first 500 chars
+          });
+        }
+      } else {
+        console.warn("⚠️ Could not parse Gemini response as JSON", cleanedResponse.substring(0, 500), parseError);
+        return NextResponse.json({
+          fraudulent: false,
+          fraudProbability: 0.1,
+          explanation:
+            "AI analysis unavailable: Gemini returned unstructured data. The receipt will be processed with ML analysis only.",
+          riskFactors: [],
+          confidence: 0.4,
+          error: "INVALID_JSON",
+          rawResponse: aiTextResponse.substring(0, 500), // Only log first 500 chars
+        });
+      }
     }
 
     const sanitizedResult = {
