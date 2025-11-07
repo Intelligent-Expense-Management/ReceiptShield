@@ -5,7 +5,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { getReceiptById, updateReceipt } from '@/lib/receipt-store';
-import type { ProcessedReceipt, ReceiptDataItem } from '@/types';
+import type { ProcessedReceipt, ReceiptDataItem, FraudAnalysis, AIFraudDetection, MLFraudPrediction } from '@/types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,7 +16,6 @@ import { useToast } from '@/hooks/use-toast';
 import { extractTextWithTesseract } from '@/lib/tesseract-ocr-service';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/contexts/auth-context'; // Import useAuth
-import type { FraudAnalysis } from '@/types';
 
 export default function VerifyReceiptPage() {
   const params = useParams();
@@ -244,31 +243,41 @@ export default function VerifyReceiptPage() {
         description: 'Running fraud detection...',
       });
 
+      const amountValue = editableItems.find(item =>
+        item.label.toLowerCase().includes('total') ||
+        item.label.toLowerCase().includes('amount')
+      )?.value || '0';
+      const merchantValue = editableItems.find(item =>
+        item.label.toLowerCase().includes('vendor') ||
+        item.label.toLowerCase().includes('store')
+      )?.value || 'Unknown';
+      const dateValue = editableItems.find(item =>
+        item.label.toLowerCase().includes('date')
+      )?.value || receipt.uploadedAt || new Date().toISOString();
+
+      const receiptDataForAnalysis = {
+        amount: amountValue,
+        merchant: merchantValue,
+        date: dateValue,
+        category: 'Business Expense',
+      };
+
       // Get ML prediction
-      let mlPrediction = null;
+      let mlPrediction: MLFraudPrediction | null = null;
+      let aiDetection: AIFraudDetection | null = null;
+
       try {
         console.log('🤖 Calling ML prediction API...');
-        
-        // Prepare receipt data for ML model
-        const receiptData = {
-          amount: editableItems.find(item => 
-            item.label.toLowerCase().includes('total') || 
-            item.label.toLowerCase().includes('amount')
-          )?.value || '0',
-          merchant: editableItems.find(item => 
-            item.label.toLowerCase().includes('vendor') || 
-            item.label.toLowerCase().includes('store')
-          )?.value || 'Unknown',
-          category: 'Business Expense', // Default category
-          items: editableItems
-        };
 
         const mlResponse = await fetch('/api/ml-predict', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify(receiptData)
+          body: JSON.stringify({
+            ...receiptDataForAnalysis,
+            items: editableItems,
+          })
         });
 
         if (mlResponse.ok) {
@@ -282,53 +291,81 @@ export default function VerifyReceiptPage() {
         console.warn('⚠️ ML prediction error:', mlError);
       }
 
-      // Create fraud analysis with ML prediction
-      const fraudResult = {
-        isFraudulent: mlPrediction?.is_fraudulent || false,
-        fraudProbability: mlPrediction?.fraud_probability || 0.1,
-        explanation: mlPrediction ? 
-          `ML Analysis: ${mlPrediction.risk_level} risk (${(mlPrediction.fraud_probability * 100).toFixed(1)}% fraud probability)` :
-          'Receipt processed successfully. No fraud detected.',
-        riskFactors: {
-          imageQuality: 'good' as const,
-          extractionConfidence: 'high' as const,
-          vendorVerification: 'unknown' as const,
-          amountReasonableness: 'normal' as const,
-        },
-        duplicateDetection: {
-          isDuplicate: false,
-          similarSubmissions: [],
-          similarityScore: 0,
-        },
-        analysis: {
-          submissionId: receipt.id,
-          receiptId: receipt.id,
-          ml_prediction: mlPrediction,
-          overall_risk_assessment: (mlPrediction?.risk_level || 'LOW') as 'LOW' | 'MEDIUM' | 'HIGH',
-          analysis_timestamp: new Date().toISOString(),
-          duplicateDetection: {
-            isDuplicate: false,
-            similarSubmissions: [],
-            similarityScore: 0,
+      try {
+        console.log('🤖 Calling AI fraud analysis API...');
+
+        const aiResponse = await fetch('/api/ai-fraud-analysis', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
           },
-          riskFactors: {
-            imageQuality: 'good' as const,
-            extractionConfidence: 'high' as const,
-            vendorVerification: 'unknown' as const,
-            amountReasonableness: 'normal' as const,
-          },
+          body: JSON.stringify({
+            items: editableItems,
+            imageUrl: receipt.imageUrl || receipt.imageDataUri,
+            receiptData: receiptDataForAnalysis
+          })
+        });
+
+        if (aiResponse.ok) {
+          const aiData = await aiResponse.json();
+          aiDetection = {
+            fraudulent: aiData.fraudulent ?? false,
+            fraudProbability: aiData.fraudProbability ?? 0.1,
+            explanation: aiData.explanation ?? 'AI analysis completed. No fraud indicators detected.',
+          };
+          console.log('✅ AI analysis received:', aiDetection);
+        } else {
+          console.warn('⚠️ AI analysis failed:', aiResponse.status);
         }
+      } catch (aiError) {
+        console.warn('⚠️ AI analysis error:', aiError);
+      }
+
+      const mlFraudProbability = mlPrediction?.fraud_probability ?? 0.1;
+      const aiFraudProbability = aiDetection?.fraudProbability ?? 0.1;
+      const mlWeight = mlPrediction ? 0.6 : 0;
+      const aiWeight = aiDetection ? 0.4 : 0;
+      const totalWeight = mlWeight + aiWeight;
+      const combinedFraudProbability = totalWeight > 0
+        ? ((mlFraudProbability * mlWeight) + (aiFraudProbability * aiWeight)) / totalWeight
+        : mlFraudProbability;
+
+      let overallRisk: 'LOW' | 'MEDIUM' | 'HIGH' = 'LOW';
+      if (combinedFraudProbability >= 0.7) {
+        overallRisk = 'HIGH';
+      } else if (combinedFraudProbability >= 0.4) {
+        overallRisk = 'MEDIUM';
+      }
+
+      const isActuallyFraudulent = (mlPrediction?.is_fraudulent ?? false) || (aiDetection?.fraudulent ?? false);
+
+      let combinedExplanation = '';
+      if (mlPrediction) {
+        combinedExplanation += `ML Analysis: ${mlPrediction.risk_level} risk (${(mlPrediction.fraud_probability * 100).toFixed(1)}% fraud probability). `;
+      }
+      if (aiDetection?.explanation) {
+        combinedExplanation += `AI Analysis: ${aiDetection.explanation}`;
+      }
+      if (!combinedExplanation) {
+        combinedExplanation = 'Receipt processed successfully. No fraud detected.';
+      }
+
+      const fraudAnalysis: FraudAnalysis = {
+        ml_prediction: mlPrediction || undefined,
+        ai_detection: aiDetection || undefined,
+        overall_risk_assessment: overallRisk,
+        analysis_timestamp: new Date().toISOString(),
       };
-      
+
       const finalReceipt: ProcessedReceipt = {
         ...receipt,
         items: editableItems,
         // Legacy fields for backward compatibility
-        isFraudulent: fraudResult.isFraudulent,
-        fraudProbability: fraudResult.fraudProbability,
-        explanation: fraudResult.explanation,
+        isFraudulent: isActuallyFraudulent,
+        fraudProbability: combinedFraudProbability,
+        explanation: combinedExplanation.trim(),
         // New comprehensive analysis
-        fraud_analysis: fraudResult.analysis,
+        fraud_analysis: fraudAnalysis,
         status: 'pending_approval', // Always set to pending_approval when employee submits
         isDraft: false, // Clear draft status when resubmitting
       };
@@ -337,7 +374,7 @@ export default function VerifyReceiptPage() {
 
       toast({
         title: `Receipt ${user?.role === 'manager' ? 'Updated' : 'Verified'} & Analyzed!`,
-        description: `ML Analysis: ${fraudResult.analysis.overall_risk_assessment || 'LOW'} risk (${(fraudResult.fraudProbability * 100).toFixed(1)}% fraud probability)`,
+        description: `${fraudAnalysis.overall_risk_assessment || 'LOW'} risk (${(combinedFraudProbability * 100).toFixed(1)}% fraud probability)`,
       });
 
       if (user?.role === 'manager') {
