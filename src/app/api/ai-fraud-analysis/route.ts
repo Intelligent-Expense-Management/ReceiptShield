@@ -60,9 +60,10 @@ export async function POST(request: NextRequest) {
         ? items.map((it: any) => `${it?.label ?? "field"}: ${it?.value ?? ""}`).join("\n")
         : "";
 
-    // Try v1 API first with gemini-pro (most stable), fallback to v1beta with gemini-1.5-flash if needed
-    const preferredModel = process.env.GEMINI_MODEL || "gemini-pro";
-    const apiVersion = process.env.GEMINI_API_VERSION || "v1";
+    // Use v1beta with gemini-1.5-pro (most current and stable model)
+    // Fallback to gemini-1.5-flash if pro is not available
+    const preferredModel = process.env.GEMINI_MODEL || "gemini-1.5-pro";
+    const apiVersion = process.env.GEMINI_API_VERSION || "v1beta";
     const apiUrl = `https://generativelanguage.googleapis.com/${apiVersion}/models/${preferredModel}:generateContent`;
     console.log(`🔧 Using Gemini API: ${apiVersion}/models/${preferredModel}`);
 
@@ -219,36 +220,50 @@ Be thorough but fair. Only flag as fraudulent if you identify clear indicators.`
         errorData = { error: { message: errorText } };
       }
 
-      // If model not found, try fallback: v1beta with gemini-1.5-flash
+      // If model not found, try fallback models
       if (geminiResponse.status === 404 && errorData?.error?.message?.includes("not found")) {
-        console.warn("⚠️ Primary model not found, trying fallback: v1beta/gemini-1.5-flash");
-        try {
-          const fallbackUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent`;
-          const fallbackController = new AbortController();
-          const fallbackTimeout = setTimeout(() => fallbackController.abort(), 60000);
-          
-          const fallbackResponse = await fetch(fallbackUrl, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "X-Goog-Api-Key": apiKey,
-            },
-            cache: "no-store",
-            body: JSON.stringify(geminiRequestBody),
-            signal: fallbackController.signal,
-          });
-          
-          clearTimeout(fallbackTimeout);
-          
-          if (fallbackResponse.ok) {
-            console.log("✅ Fallback model worked!");
-            geminiResponse = fallbackResponse;
-          } else {
-            throw new Error("Fallback also failed");
+        const fallbackModels = [
+          { version: "v1beta", model: "gemini-1.5-flash" },
+          { version: "v1beta", model: "gemini-pro" },
+          { version: "v1", model: "gemini-pro" },
+        ];
+        
+        for (const fallback of fallbackModels) {
+          if (fallback.version === apiVersion && fallback.model === preferredModel) {
+            continue; // Skip if it's the same as what we just tried
           }
-        } catch (fallbackError) {
-          console.error("❌ Fallback model also failed:", fallbackError);
-          // Continue to error handling below
+          
+          console.warn(`⚠️ Trying fallback: ${fallback.version}/models/${fallback.model}`);
+          try {
+            const fallbackUrl = `https://generativelanguage.googleapis.com/${fallback.version}/models/${fallback.model}:generateContent`;
+            const fallbackController = new AbortController();
+            const fallbackTimeout = setTimeout(() => fallbackController.abort(), 60000);
+            
+            const fallbackResponse = await fetch(fallbackUrl, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "X-Goog-Api-Key": apiKey,
+              },
+              cache: "no-store",
+              body: JSON.stringify(geminiRequestBody),
+              signal: fallbackController.signal,
+            });
+            
+            clearTimeout(fallbackTimeout);
+            
+            if (fallbackResponse.ok) {
+              console.log(`✅ Fallback model worked: ${fallback.version}/models/${fallback.model}`);
+              geminiResponse = fallbackResponse;
+              break; // Success, exit fallback loop
+            } else {
+              const fallbackErrorText = await fallbackResponse.text();
+              console.warn(`⚠️ Fallback ${fallback.model} failed:`, fallbackErrorText.substring(0, 200));
+            }
+          } catch (fallbackError: any) {
+            console.warn(`⚠️ Fallback ${fallback.model} error:`, fallbackError.message);
+            // Continue to next fallback
+          }
         }
       }
 
