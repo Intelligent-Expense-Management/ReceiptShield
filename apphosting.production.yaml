@@ -45,6 +45,12 @@ env:
       - BUILD
       - RUNTIME
   
+  # Google Gemini API key for AI fraud analysis
+  - variable: GOOGLE_AI_API_KEY
+    secret: GOOGLE_AI_API_KEY
+    availability:
+      - RUNTIME
+
   # Firebase Configuration (from existing setup)
   - variable: NEXT_PUBLIC_FIREBASE_API_KEY
     value: "AIzaSyBJUMBq1qLQnJjNz7lp72lJ7awKeod3qMo"
