@@ -1,5 +1,4 @@
 import { NextRequest } from 'next/server';
-import { headers } from 'next/headers';
 
 export interface MonitoringUser {
   id: string;
@@ -8,7 +7,7 @@ export interface MonitoringUser {
   name: string;
 }
 
-export function getMonitoringUser(request: NextRequest): MonitoringUser | null {
+export async function getMonitoringUser(request: NextRequest): Promise<MonitoringUser | null> {
   try {
     // In a real implementation, you would:
     // 1. Extract JWT token from Authorization header
@@ -56,16 +55,16 @@ export function getMonitoringUser(request: NextRequest): MonitoringUser | null {
   }
 }
 
-export function requireMonitoringAuth(request: NextRequest): MonitoringUser {
-  const user = getMonitoringUser(request);
+export async function requireMonitoringAuth(request: NextRequest): Promise<MonitoringUser> {
+  const user = await getMonitoringUser(request);
   if (!user) {
     throw new Error('Unauthorized: Monitoring access required');
   }
   return user;
 }
 
-export function requireAdminAccess(request: NextRequest): MonitoringUser {
-  const user = requireMonitoringAuth(request);
+export async function requireAdminAccess(request: NextRequest): Promise<MonitoringUser> {
+  const user = await requireMonitoringAuth(request);
   if (user.role !== 'admin') {
     throw new Error('Forbidden: Admin access required');
   }

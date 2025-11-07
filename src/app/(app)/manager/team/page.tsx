@@ -48,6 +48,19 @@ export default function ManagerTeamPage() {
         
         // Get all receipts for this manager's team
         const allReceipts = await getReceiptsBySupervisor(user.id, user.companyId);
+
+        const parseDate = (value: unknown): Date => {
+          if (!value) {
+            return new Date(0);
+          }
+          if (value instanceof Date) {
+            return value;
+          }
+          if (typeof value === 'string' || typeof value === 'number') {
+            return new Date(value);
+          }
+          return new Date(0);
+        };
         
         // Calculate stats for each team member
         const memberData: TeamMemberData[] = employees.map(employee => {
@@ -69,15 +82,13 @@ export default function ManagerTeamPage() {
           const fraudAlerts = employeeReceipts.filter(r => r.isFraudulent).length;
           
           const sortedReceipts = [...employeeReceipts].sort((a, b) => {
-            const dateA = a.uploadedAt instanceof Date ? a.uploadedAt : new Date(a.uploadedAt);
-            const dateB = b.uploadedAt instanceof Date ? b.uploadedAt : new Date(b.uploadedAt);
+            const dateA = parseDate(a.uploadedAt);
+            const dateB = parseDate(b.uploadedAt);
             return dateB.getTime() - dateA.getTime();
           });
           
           const lastSubmission = sortedReceipts.length > 0 
-            ? sortedReceipts[0].uploadedAt instanceof Date 
-              ? sortedReceipts[0].uploadedAt.toLocaleDateString()
-              : new Date(sortedReceipts[0].uploadedAt).toLocaleDateString()
+            ? parseDate(sortedReceipts[0].uploadedAt).toLocaleDateString()
             : null;
           
           return {

@@ -93,7 +93,7 @@ export default function NotificationsPage() {
 
     try {
       setIsSyncing(true);
-      const allReceipts = await getAllReceipts(user.companyId);
+      const allReceipts = await getAllReceipts(undefined, user.companyId);
       const userId = user.email || user.id || '';
 
       // Generate notifications from receipt data and upsert to Firestore

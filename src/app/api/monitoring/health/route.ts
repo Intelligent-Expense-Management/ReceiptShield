@@ -6,7 +6,7 @@ import { requireMonitoringAuth, logMonitoringAccess } from '@/lib/monitoring-aut
 export async function GET(request: NextRequest) {
   try {
     // Require authentication for monitoring access
-    const user = requireMonitoringAuth(request);
+    const user = await requireMonitoringAuth(request);
     logMonitoringAccess(user, '/api/monitoring/health', 'GET');
     const startTime = Date.now();
     
