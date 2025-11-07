@@ -438,24 +438,77 @@ Be thorough but fair. Only flag as fraudulent if you identify clear indicators.`
     try {
       aiResult = JSON.parse(cleanedResponse);
     } catch (parseError: any) {
-      // If JSON is incomplete, try to extract what we can
-      if (parseError.message?.includes('end of JSON input') || parseError.message?.includes('Unexpected')) {
-        console.warn("⚠️ Incomplete JSON response, attempting to extract partial data");
+      // If JSON is incomplete or has unterminated strings, try to extract what we can
+      const isIncompleteError = parseError.message?.includes('end of JSON input') || 
+                                parseError.message?.includes('Unexpected') ||
+                                parseError.message?.includes('Unterminated string') ||
+                                parseError.message?.includes('Unexpected token');
+      
+      if (isIncompleteError) {
+        console.warn("⚠️ Incomplete or malformed JSON response, attempting to extract partial data");
         
         // Try to extract partial data from incomplete JSON
         try {
-          // Find all key-value pairs we can extract
+          // Find all key-value pairs we can extract (handle unterminated strings)
           const fraudulentMatch = cleanedResponse.match(/"fraudulent"\s*:\s*(true|false)/i);
           const probabilityMatch = cleanedResponse.match(/"fraudProbability"\s*:\s*([0-9.]+)/i);
-          const explanationMatch = cleanedResponse.match(/"explanation"\s*:\s*"([^"]*)/i);
+          
+          // For explanation, extract everything after the opening quote until end or next quote (handles unterminated strings)
+          let explanationText = '';
+          const explanationStartMatch = cleanedResponse.match(/"explanation"\s*:\s*"/i);
+          if (explanationStartMatch) {
+            const startIndex = explanationStartMatch.index! + explanationStartMatch[0].length;
+            // Extract everything from start to end of string or end of response
+            // Handle escaped quotes and newlines
+            let inString = true;
+            let extracted = '';
+            for (let i = startIndex; i < cleanedResponse.length; i++) {
+              const char = cleanedResponse[i];
+              if (char === '\\') {
+                // Skip escaped characters
+                if (i + 1 < cleanedResponse.length) {
+                  extracted += char + cleanedResponse[i + 1];
+                  i++;
+                  continue;
+                }
+              } else if (char === '"' && (i === 0 || cleanedResponse[i - 1] !== '\\')) {
+                // End of string (not escaped)
+                break;
+              } else if (char === '\n' && cleanedResponse.substring(i, i + 2) === '\n\n') {
+                // Likely end of explanation if we hit double newline
+                break;
+              }
+              extracted += char;
+            }
+            explanationText = extracted.trim();
+          }
+          
+          // Extract riskFactors if present (array)
+          const riskFactorsMatch = cleanedResponse.match(/"riskFactors"\s*:\s*\[([^\]]*)\]/i);
+          const riskFactors: string[] = [];
+          if (riskFactorsMatch) {
+            const factorsText = riskFactorsMatch[1];
+            const factorMatches = factorsText.match(/"([^"]+)"/g);
+            if (factorMatches) {
+              factorMatches.forEach((match: string) => {
+                const factor = match.replace(/"/g, '').trim();
+                if (factor) riskFactors.push(factor);
+              });
+            }
+          }
+          
+          // Extract confidence if present
+          const confidenceMatch = cleanedResponse.match(/"confidence"\s*:\s*([0-9.]+)/i);
           
           if (fraudulentMatch || probabilityMatch) {
             aiResult = {
               fraudulent: fraudulentMatch ? fraudulentMatch[1].toLowerCase() === 'true' : false,
               fraudProbability: probabilityMatch ? parseFloat(probabilityMatch[1]) : 0.5,
-              explanation: explanationMatch ? explanationMatch[1] + " (Response was truncated, analysis may be incomplete.)" : "AI analysis was truncated but indicates potential fraud concerns.",
-              riskFactors: [],
-              confidence: 0.6,
+              explanation: explanationText 
+                ? explanationText + " (Response was truncated, analysis may be incomplete.)"
+                : "AI analysis was truncated but indicates potential fraud concerns.",
+              riskFactors: riskFactors.length > 0 ? riskFactors : [],
+              confidence: confidenceMatch ? parseFloat(confidenceMatch[1]) : 0.6,
             };
             console.log("✅ Extracted partial data from incomplete JSON");
           } else {
