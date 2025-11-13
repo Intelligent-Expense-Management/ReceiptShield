@@ -11,8 +11,7 @@ import {
   AlertCircle,
   Plus,
   FileText,
-  BarChart3,
-  Lightbulb
+  BarChart3
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { AnalyticsDashboard } from '@/components/analytics/analytics-dashboard';
@@ -299,40 +298,6 @@ export function OriginDashboardEnhanced({ user }: OriginDashboardEnhancedProps) 
           </CardContent>
         </Card>
       </div>
-
-      {/* Insights */}
-      <Card className="origin-card">
-        <CardHeader>
-          <CardTitle>AI Insights</CardTitle>
-          <CardDescription>Smart recommendations based on your data</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
-              <div className="flex items-start space-x-3">
-                <Lightbulb className="h-5 w-5 text-primary mt-0.5" />
-                <div>
-                  <p className="font-medium">Spending Pattern Detected</p>
-                  <p className="text-sm text-muted-foreground">
-                    You tend to spend more on weekdays. Consider setting a daily budget limit.
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div className="p-4 rounded-lg bg-accent/5 border border-accent/20">
-              <div className="flex items-start space-x-3">
-                <TrendingUp className="h-5 w-5 text-accent mt-0.5" />
-                <div>
-                  <p className="font-medium">Expense Optimization</p>
-                  <p className="text-sm text-muted-foreground">
-                    You could save ~$50/month by consolidating similar purchases.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Analytics Dashboard */}
       {showAnalytics && (
