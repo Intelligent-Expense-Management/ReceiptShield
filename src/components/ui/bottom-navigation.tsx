@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, DollarSign, BarChart, Lightbulb, UserCircle } from "lucide-react";
+import { Home, DollarSign, BarChart, UserCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function BottomNavigation() {
@@ -12,7 +12,6 @@ export function BottomNavigation() {
     { href: "/employee/dashboard", icon: Home, label: "Home" },
     { href: "/employee/spending", icon: DollarSign, label: "Spending" },
     { href: "/employee/budget", icon: BarChart, label: "Budget" },
-    { href: "/employee/insights", icon: Lightbulb, label: "Insights" },
     { href: "/profile", icon: UserCircle, label: "Profile" },
   ];
 

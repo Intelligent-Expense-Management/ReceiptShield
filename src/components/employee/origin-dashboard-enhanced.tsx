@@ -96,7 +96,7 @@ export function OriginDashboardEnhanced({ user }: OriginDashboardEnhancedProps) 
       icon: BarChart3, 
       onClick: () => setShowAnalytics(!showAnalytics) 
     },
-    { label: "Get Insights", icon: Lightbulb, href: "/employee/insights" }
+    { label: "View My Receipts", icon: ReceiptText, href: "/employee/receipts" }
   ];
 
   if (isLoading) {
