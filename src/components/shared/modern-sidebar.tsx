@@ -188,12 +188,6 @@ export function ModernSidebar({
             label: "Analytics",
             icon: BarChart3,
             badge: null
-          },
-          {
-            href: `${basePath}/insights`,
-            label: "AI Insights",
-            icon: ShieldAlert,
-            badge: null
           }
         ];
       
