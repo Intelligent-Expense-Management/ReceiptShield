@@ -53,20 +53,51 @@ Keep your response to 2-3 sentences unless the user asks for more detail.`;
 
     console.log('🔍 Calling Google Gemini API for assistant...');
     
-    const response = await fetch(apiUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(requestBody),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.text();
-      console.error('❌ Gemini API error:', response.status, errorData);
+    // Retry logic for rate limits
+    const maxRetries = 3;
+    let lastError: any = null;
+    let lastResponse: Response | null = null;
+    
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      if (attempt > 0) {
+        // Exponential backoff: wait 1s, 2s, 4s
+        const waitTime = Math.pow(2, attempt - 1) * 1000;
+        console.log(`⏳ Rate limited, waiting ${waitTime}ms before retry ${attempt}/${maxRetries}...`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+      }
       
-      // Handle rate limiting (429)
-      if (response.status === 429) {
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      if (response.ok) {
+        lastResponse = response;
+        break; // Success, exit retry loop
+      }
+
+      lastResponse = response;
+      const errorData = await response.text();
+      console.error(`❌ Gemini API error (attempt ${attempt + 1}/${maxRetries + 1}):`, response.status, errorData);
+      
+      // Only retry on rate limit errors (429)
+      if (response.status === 429 && attempt < maxRetries) {
+        lastError = { status: 429, message: errorData };
+        continue; // Retry
+      }
+      
+      // For non-429 errors or after max retries, break and handle error
+      lastError = { status: response.status, message: errorData };
+      break;
+    }
+
+    // Handle errors after retries
+    if (!lastResponse || !lastResponse.ok) {
+      // Handle rate limiting (429) - after all retries exhausted
+      if (lastError?.status === 429) {
         return NextResponse.json({
           response: "I'm currently experiencing high demand. Please wait a moment and try again in a few seconds. Rate limits help ensure fair access for all users.",
           error: 'RATE_LIMIT_EXCEEDED',
@@ -76,15 +107,15 @@ Keep your response to 2-3 sentences unless the user asks for more detail.`;
       
       // Handle other API errors
       return NextResponse.json({
-        response: response.status === 401 || response.status === 403
+        response: lastError?.status === 401 || lastError?.status === 403
           ? "I'm sorry, there's an authentication issue with the AI service. Please contact support."
           : "I'm sorry, I encountered an error processing your request. Please try again later.",
-        error: `Gemini API error: ${response.status}`,
+        error: `Gemini API error: ${lastError?.status || 'Unknown'}`,
         suggestUpload: false
-      }, { status: response.status });
+      }, { status: lastError?.status || 500 });
     }
 
-    const data = await response.json();
+    const data = await lastResponse.json();
     
     if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
       return NextResponse.json({
