@@ -48,7 +48,16 @@ export default function EmployeeReceiptsPage() {
     loadReceipts();
   }, [user]);
 
-  const getStatusIcon = (status?: string) => {
+  const getStatusIcon = (receipt: ProcessedReceipt) => {
+    const status = receipt.status;
+    const managerRequestedMoreInfo =
+      (status === 'draft' || receipt.isDraft) &&
+      receipt.managerNotes?.includes('Request for more information');
+
+    if (managerRequestedMoreInfo) {
+      return <AlertCircle className="h-4 w-4 text-orange-600" />;
+    }
+
     switch (status) {
       case 'approved':
         return <CheckCircle className="h-4 w-4 text-green-600" />;
@@ -63,7 +72,20 @@ export default function EmployeeReceiptsPage() {
     }
   };
 
-  const getStatusBadge = (status?: string) => {
+  const getStatusBadge = (receipt: ProcessedReceipt) => {
+    const status = receipt.status;
+    const managerRequestedMoreInfo =
+      (status === 'draft' || receipt.isDraft) &&
+      receipt.managerNotes?.includes('Request for more information');
+
+    if (managerRequestedMoreInfo) {
+      return (
+        <Badge variant="outline" className="border-orange-500 text-orange-700 bg-orange-50">
+          Needs More Info
+        </Badge>
+      );
+    }
+
     switch (status) {
       case 'approved':
         return <Badge variant="default" className="bg-green-100 text-green-800">Approved</Badge>;
@@ -193,7 +215,7 @@ export default function EmployeeReceiptsPage() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">
                         <div className="p-3 bg-primary/10 rounded-lg">
-                          {getStatusIcon(receipt.status)}
+                          {getStatusIcon(receipt)}
                         </div>
                         <div className="space-y-1">
                           <h3 className="text-lg font-semibold text-foreground">
@@ -217,7 +239,7 @@ export default function EmployeeReceiptsPage() {
                         </div>
                         
                         <div className="flex flex-col items-end gap-2">
-                          {getStatusBadge(receipt.status)}
+                          {getStatusBadge(receipt)}
                           <Button
                             variant="outline"
                             size="sm"

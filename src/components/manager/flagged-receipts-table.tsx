@@ -196,7 +196,7 @@ export function FlaggedReceiptsTable({ teamMembers }: FlaggedReceiptsTableProps)
                   ) : receipt.status === 'draft' || receipt.isDraft ? (
                     <Badge variant="outline" className={receipt.managerNotes?.includes('Request for more information') ? "border-orange-500 text-orange-600" : "border-gray-500 text-gray-600"}>
                       <Edit3 className="w-3 h-3 mr-1.5" />
-                      {receipt.managerNotes?.includes('Request for more information') ? 'Needs Revision' : 'Draft'}
+                      {receipt.managerNotes?.includes('Request for more information') ? 'Needs More Info' : 'Draft'}
                     </Badge>
                   ) : (
                     <Badge variant="secondary" className="bg-blue-100 text-blue-700 border-blue-200">

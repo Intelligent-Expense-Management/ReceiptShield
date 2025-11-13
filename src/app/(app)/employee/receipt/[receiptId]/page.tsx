@@ -138,7 +138,7 @@ export default function ReceiptDetailsPage() {
       return <Badge variant="default" className="bg-green-500 hover:bg-green-600 text-white"><CheckCircle className="w-4 h-4 mr-1.5"/>Approved by Manager</Badge>;
     }
     if (receipt.status === 'draft' || receipt.isDraft) {
-      return <Badge variant="outline" className="border-orange-500 text-orange-600"><Edit3 className="w-4 h-4 mr-1.5"/>Needs Revision</Badge>;
+      return <Badge variant="outline" className="border-orange-500 text-orange-600"><Edit3 className="w-4 h-4 mr-1.5"/>Needs More Info</Badge>;
     }
     if (receipt.status === 'pending_approval') {
       return <Badge variant="secondary"><ShieldQuestion className="w-4 h-4 mr-1.5"/>Pending Manager Review</Badge>;
