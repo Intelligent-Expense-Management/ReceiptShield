@@ -21,6 +21,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (!auth) {
+      return NextResponse.json(
+        { error: 'Firebase Admin SDK not initialized' },
+        { status: 500 }
+      );
+    }
+
     const token = authHeader.split('Bearer ')[1];
     
     // Verify the Firebase token

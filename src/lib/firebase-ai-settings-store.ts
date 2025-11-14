@@ -37,6 +37,9 @@ export async function getAISettings(): Promise<AISettings | null> {
 export async function getAISettingsAdmin(): Promise<AISettings | null> {
   try {
     const { db: adminDb } = await import('./firebase-admin');
+    if (!adminDb) {
+      throw new Error('Firebase Admin SDK not initialized');
+    }
     const settingsDoc = await adminDb.collection('platform_settings').doc(SETTINGS_DOC_ID).get();
     
     if (settingsDoc.exists) {
@@ -89,6 +92,9 @@ export async function updateAISettingsAdmin(
 ): Promise<void> {
   try {
     const { db: adminDb } = await import('./firebase-admin');
+    if (!adminDb) {
+      throw new Error('Firebase Admin SDK not initialized');
+    }
     const { FieldValue } = await import('firebase-admin/firestore');
     const settingsRef = adminDb.collection('platform_settings').doc(SETTINGS_DOC_ID);
     const existingSettings = await getAISettingsAdmin();

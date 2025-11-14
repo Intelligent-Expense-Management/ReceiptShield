@@ -248,7 +248,7 @@ export async function GET(request: NextRequest) {
       };
       
       // Try to verify token if present
-      if (authHeader && authHeader.startsWith('Bearer ')) {
+      if (authHeader && authHeader.startsWith('Bearer ') && auth && db) {
         try {
           const token = authHeader.split('Bearer ')[1];
           const decodedToken = await auth.verifyIdToken(token);
@@ -353,7 +353,7 @@ export async function GET(request: NextRequest) {
     };
     
     // Try to verify token if present
-    if (authHeader && authHeader.startsWith('Bearer ')) {
+    if (authHeader && authHeader.startsWith('Bearer ') && auth) {
       try {
         const token = authHeader.split('Bearer ')[1];
         const decodedToken = await auth.verifyIdToken(token);
