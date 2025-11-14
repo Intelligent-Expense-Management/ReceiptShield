@@ -259,6 +259,13 @@ export function ModernSidebar({
             icon: Activity,
             badge: null
           }] : []),
+          // AI Settings for platform admins
+          ...(user?.isPlatformAdmin ? [{
+            href: "/platform/ai-settings",
+            label: "AI Settings",
+            icon: Bot,
+            badge: null
+          }] : []),
           {
             href: `${basePath}/fraud-alerts`,
             label: "Fraud Detection",

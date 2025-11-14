@@ -1,17 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getAISettingsAdmin } from '@/lib/firebase-ai-settings-store';
 
 /**
  * AI Assistant API Route
  * Uses Google Gemini to provide conversational assistance
+ * Settings can be configured by platform admins in Firestore, with env var fallback
  */
 export async function POST(request: NextRequest) {
   try {
     const { message, receiptHistory } = await request.json();
     console.log('🤖 AI Assistant Request received');
 
-    const apiKey = process.env.GOOGLE_AI_API_KEY || 
-                   process.env.GEMINI_API_KEY ||
-                   process.env.GOOGLE_API_KEY;
+    // Try to get settings from Firestore first, fallback to env vars
+    let apiKey: string | undefined;
+    let model: string | undefined;
+    
+    try {
+      const settings = await getAISettingsAdmin();
+      if (settings) {
+        apiKey = settings.geminiApiKey;
+        model = settings.geminiModel;
+        console.log('📋 Using AI settings from Firestore');
+      }
+    } catch (error) {
+      console.warn('⚠️ Could not load AI settings from Firestore, using env vars:', error);
+    }
+
+    // Fallback to environment variables if Firestore settings not available
+    apiKey = apiKey || process.env.GOOGLE_AI_API_KEY || 
+                       process.env.GEMINI_API_KEY ||
+                       process.env.GOOGLE_API_KEY;
     
     if (!apiKey || apiKey === 'your_google_ai_api_key_here') {
       console.warn('⚠️ Google AI API key not configured');
@@ -34,7 +52,8 @@ Please provide a helpful, concise, and professional response. If the user asks a
 Keep your response to 2-3 sentences unless the user asks for more detail.`;
 
     // Use Gemini API
-    const model = process.env.GEMINI_MODEL || 'gemini-2.0-flash-exp';
+    // Model from Firestore settings or env var, default to gemini-2.0-flash
+    model = model || process.env.GEMINI_MODEL || 'gemini-2.0-flash';
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
     const requestBody = {
@@ -57,14 +76,18 @@ Keep your response to 2-3 sentences unless the user asks for more detail.`;
     const maxRetries = 3;
     let lastError: any = null;
     let lastResponse: Response | null = null;
+    let hasWaitedForRetryAfter = false;
     
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
-      if (attempt > 0) {
-        // Exponential backoff: wait 1s, 2s, 4s
-        const waitTime = Math.pow(2, attempt - 1) * 1000;
+      // Only wait if we haven't already waited due to Retry-After header
+      if (attempt > 0 && !hasWaitedForRetryAfter) {
+        // Exponential backoff: wait 2s, 5s, 10s (longer delays for rate limits)
+        const waitTime = attempt === 1 ? 2000 : attempt === 2 ? 5000 : 10000;
         console.log(`⏳ Rate limited, waiting ${waitTime}ms before retry ${attempt}/${maxRetries}...`);
         await new Promise(resolve => setTimeout(resolve, waitTime));
       }
+      // Reset flag after checking (for next iteration)
+      hasWaitedForRetryAfter = false;
       
       const response = await fetch(apiUrl, {
         method: 'POST',
@@ -83,14 +106,26 @@ Keep your response to 2-3 sentences unless the user asks for more detail.`;
       const errorData = await response.text();
       console.error(`❌ Gemini API error (attempt ${attempt + 1}/${maxRetries + 1}):`, response.status, errorData);
       
+      // Check for Retry-After header
+      const retryAfter = response.headers.get('Retry-After');
+      const retryAfterSeconds = retryAfter ? parseInt(retryAfter, 10) : null;
+      
       // Only retry on rate limit errors (429)
       if (response.status === 429 && attempt < maxRetries) {
-        lastError = { status: 429, message: errorData };
+        lastError = { status: 429, message: errorData, retryAfter: retryAfterSeconds };
+        
+        // If Retry-After header is present, use it instead of exponential backoff
+        if (retryAfterSeconds && retryAfterSeconds > 0) {
+          console.log(`⏳ API suggests waiting ${retryAfterSeconds} seconds (from Retry-After header)`);
+          await new Promise(resolve => setTimeout(resolve, retryAfterSeconds * 1000));
+          hasWaitedForRetryAfter = true; // Mark that we've already waited
+        }
+        
         continue; // Retry
       }
       
       // For non-429 errors or after max retries, break and handle error
-      lastError = { status: response.status, message: errorData };
+      lastError = { status: response.status, message: errorData, retryAfter: retryAfterSeconds };
       break;
     }
 
@@ -98,8 +133,21 @@ Keep your response to 2-3 sentences unless the user asks for more detail.`;
     if (!lastResponse || !lastResponse.ok) {
       // Handle rate limiting (429) - after all retries exhausted
       if (lastError?.status === 429) {
+        // Provide a helpful fallback response based on the question
+        let fallbackResponse = "I'm currently experiencing high demand. Please wait a moment and try again in a few seconds. Rate limits help ensure fair access for all users.";
+        
+        // Try to provide a basic helpful response for common questions
+        const lowerMessage = message.toLowerCase();
+        if (lowerMessage.includes('working') || lowerMessage.includes('function') || lowerMessage.includes('are you')) {
+          fallbackResponse = "Yes, I'm working! I'm your AI assistant for ReceiptShield. I can help you with questions about your expenses, receipts, and financial management. However, I'm currently experiencing high demand. Please try again in a few moments.";
+        } else if (lowerMessage.includes('receipt') || lowerMessage.includes('upload')) {
+          fallbackResponse = "I can help you with receipts! You can upload receipts through the 'Upload Receipt' option in the menu. I'm currently experiencing high demand, but please try asking again in a few seconds.";
+        } else if (lowerMessage.includes('expense') || lowerMessage.includes('spending')) {
+          fallbackResponse = "I can help you understand your expenses and spending patterns. Check your dashboard for analytics and recent receipts. I'm currently experiencing high demand - please try again in a few moments.";
+        }
+        
         return NextResponse.json({
-          response: "I'm currently experiencing high demand. Please wait a moment and try again in a few seconds. Rate limits help ensure fair access for all users.",
+          response: fallbackResponse,
           error: 'RATE_LIMIT_EXCEEDED',
           suggestUpload: false
         }, { status: 429 });

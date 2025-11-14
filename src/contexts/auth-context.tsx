@@ -71,8 +71,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         message = 'No account found with this email address.';
       } else if (error.code === 'auth/wrong-password') {
         message = 'Incorrect password.';
+      } else if (error.code === 'auth/invalid-credential') {
+        message = 'Invalid email or password. Please check your credentials and try again.';
       } else if (error.code === 'auth/invalid-email') {
         message = 'Invalid email address.';
+      } else if (error.code === 'auth/user-disabled') {
+        message = 'This account has been disabled. Please contact support.';
+      } else if (error.code === 'auth/too-many-requests') {
+        message = 'Too many failed login attempts. Please try again later.';
       } else if (error.message) {
         message = error.message;
       }
