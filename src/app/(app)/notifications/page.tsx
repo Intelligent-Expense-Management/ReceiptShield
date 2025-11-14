@@ -443,138 +443,163 @@ export default function NotificationsPage() {
   }
 
   return (
-    <div className="space-y-6 p-6 bg-[var(--color-bg)] text-[var(--color-text)]">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 sm:space-y-6 p-4 sm:p-6 bg-[var(--color-bg)] text-[var(--color-text)] pb-24 sm:pb-6">
+      {/* Header */}
+      <div className="space-y-4">
         <div>
-          <h1 className="text-3xl font-bold text-[var(--color-text)]">Notifications</h1>
-          <p className="text-[var(--color-text-secondary)] mt-2">Real-time updates from your expense management activities</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-[var(--color-text)]">Notifications</h1>
+          <p className="text-sm sm:text-base text-[var(--color-text-secondary)] mt-1 sm:mt-2">
+            Real-time updates from your expense management activities
+          </p>
         </div>
-        <div className="flex items-center space-x-2">
-          <Badge variant="secondary" className="px-3 py-1">
-            <Bell className="h-4 w-4 mr-1" />
-            {unreadCount} unread
+        
+        {/* Stats and Actions */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <Badge variant="secondary" className="w-fit px-3 py-1.5">
+            <Bell className="h-4 w-4 mr-1.5" />
+            <span className="text-sm font-medium">{unreadCount} unread</span>
           </Badge>
-          <div className="flex space-x-2">
+          
+          <div className="flex items-center gap-2 flex-wrap">
             <Button 
               variant="outline" 
+              size="sm"
               onClick={handleRefresh}
               disabled={isLoading || isSyncing}
+              className="text-xs sm:text-sm"
             >
               {isLoading || isSyncing ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  {isSyncing ? 'Syncing...' : 'Refreshing...'}
+                  <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1.5 animate-spin" />
+                  <span className="hidden sm:inline">{isSyncing ? 'Syncing...' : 'Refreshing...'}</span>
+                  <span className="sm:hidden">{isSyncing ? 'Sync' : 'Refresh'}</span>
                 </>
               ) : (
                 'Refresh'
               )}
             </Button>
-            <Button variant="outline" onClick={handleMarkAllAsRead} disabled={unreadCount === 0}>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={handleMarkAllAsRead} 
+              disabled={unreadCount === 0}
+              className="text-xs sm:text-sm"
+            >
               Mark All Read
-            </Button>
-            <Button variant="outline" onClick={handleClearAll} disabled={notifications.length === 0}>
-              Clear All
             </Button>
           </div>
         </div>
-      </div>
 
-      {/* Filter Buttons */}
-      <div className="flex space-x-2">
-        <Button
-          variant={filter === "all" ? "default" : "outline"}
-          onClick={() => setFilter("all")}
-        >
-          All ({notifications.length})
-        </Button>
-        <Button
-          variant={filter === "unread" ? "default" : "outline"}
-          onClick={() => setFilter("unread")}
-        >
-          Unread ({unreadCount})
-        </Button>
-        <Button
-          variant={filter === "high" ? "default" : "outline"}
-          onClick={() => setFilter("high")}
-        >
-          High Priority ({notifications.filter(n => n.priority === "high").length})
-        </Button>
+        {/* Filter Buttons */}
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant={filter === "all" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setFilter("all")}
+            className="text-xs sm:text-sm"
+          >
+            All ({notifications.length})
+          </Button>
+          <Button
+            variant={filter === "unread" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setFilter("unread")}
+            className="text-xs sm:text-sm"
+          >
+            Unread ({unreadCount})
+          </Button>
+          <Button
+            variant={filter === "high" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setFilter("high")}
+            className="text-xs sm:text-sm"
+          >
+            High Priority ({notifications.filter(n => n.priority === "high").length})
+          </Button>
+        </div>
       </div>
 
       {/* Notifications List */}
       <Card>
-        <CardHeader>
-          <CardTitle>Recent Notifications</CardTitle>
-          <CardDescription>Your latest notifications and updates</CardDescription>
+        <CardHeader className="p-4 sm:p-6">
+          <CardTitle className="text-lg sm:text-xl">Recent Notifications</CardTitle>
+          <CardDescription className="text-xs sm:text-sm">Your latest notifications and updates</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-4 sm:p-6 pt-0">
           {filteredNotifications.length === 0 ? (
-            <div className="text-center py-12">
-              <Bell className="h-12 w-12 text-[var(--color-text-secondary)] mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-[var(--color-text)] mb-2">No Notifications</h3>
-              <p className="text-[var(--color-text-secondary)] mb-4">
+            <div className="text-center py-8 sm:py-12">
+              <Bell className="h-10 w-10 sm:h-12 sm:w-12 text-[var(--color-text-secondary)] mx-auto mb-3 sm:mb-4" />
+              <h3 className="text-base sm:text-lg font-medium text-[var(--color-text)] mb-2">No Notifications</h3>
+              <p className="text-sm text-[var(--color-text-secondary)] mb-4">
                 {filter === "all" 
                   ? "No notifications found. All caught up!" 
                   : `No ${filter} notifications found.`
                 }
               </p>
-              <Button onClick={handleRefresh} variant="outline">
+              <Button onClick={handleRefresh} variant="outline" size="sm">
                 Refresh Notifications
               </Button>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               {filteredNotifications.map((notification) => (
               <div
                 key={notification.id}
-                className={`flex items-start space-x-4 p-4 border border-[var(--color-border)] rounded-lg transition-colors ${
+                className={`flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-4 p-3 sm:p-4 border border-[var(--color-border)] rounded-lg transition-colors ${
                   notification.read ? "bg-[var(--color-bg-secondary)]" : "bg-[var(--color-card)] border-blue-200"
                 }`}
               >
-                <div className="flex-shrink-0">
-                  {getTypeIcon(notification.type)}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center space-x-2 mb-1">
-                    <h3 className="font-medium text-[var(--color-text)]">{notification.title}</h3>
-                    <Badge variant={getPriorityColor(notification.priority)}>
-                      {getPriorityIcon(notification.priority)}
-                      <span className="ml-1 capitalize">{notification.priority}</span>
-                    </Badge>
-                    {!notification.read && (
-                      <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
-                    )}
+                <div className="flex items-start gap-3 sm:gap-4 flex-1 min-w-0">
+                  <div className="flex-shrink-0 mt-0.5">
+                    {getTypeIcon(notification.type)}
                   </div>
-                  <p className="text-sm text-[var(--color-text-secondary)] mb-2">{notification.message}</p>
-                  <p className="text-xs text-[var(--color-text-secondary)]">
-                    {typeof notification.timestamp === 'string' 
-                      ? notification.timestamp 
-                      : notification.timestamp.toLocaleString()}
-                  </p>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                      <h3 className="font-medium text-sm sm:text-base text-[var(--color-text)]">{notification.title}</h3>
+                      <Badge variant={getPriorityColor(notification.priority)} className="text-xs">
+                        {getPriorityIcon(notification.priority)}
+                        <span className="ml-1 capitalize hidden sm:inline">{notification.priority}</span>
+                      </Badge>
+                      {!notification.read && (
+                        <div className="w-2 h-2 bg-blue-600 rounded-full flex-shrink-0"></div>
+                      )}
+                    </div>
+                    <p className="text-xs sm:text-sm text-[var(--color-text-secondary)] mb-1.5">{notification.message}</p>
+                    <p className="text-xs text-[var(--color-text-secondary)]">
+                      {typeof notification.timestamp === 'string' 
+                        ? notification.timestamp 
+                        : notification.timestamp.toLocaleString()}
+                    </p>
+                  </div>
                 </div>
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center gap-2 flex-shrink-0 sm:flex-col sm:items-end">
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => handleNotificationAction(notification)}
+                    className="text-xs sm:text-sm flex-1 sm:flex-initial"
                   >
-                    Take Action
+                    <span className="hidden sm:inline">Take Action</span>
+                    <span className="sm:hidden">Action</span>
                   </Button>
                   {!notification.read && (
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => handleMarkAsRead(notification.id)}
+                      className="text-xs sm:text-sm"
                     >
-                      Mark Read
+                      <span className="hidden sm:inline">Mark Read</span>
+                      <span className="sm:hidden">Read</span>
                     </Button>
                   )}
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => handleDeleteNotification(notification.id)}
+                    className="p-2"
                   >
-                    <X className="h-4 w-4" />
+                    <X className="h-3 w-3 sm:h-4 sm:w-4" />
                   </Button>
                 </div>
               </div>
@@ -586,32 +611,32 @@ export default function NotificationsPage() {
 
       {/* Notification Settings */}
       <Card>
-        <CardHeader>
-          <CardTitle>Notification Settings</CardTitle>
-          <CardDescription>Configure how you receive notifications</CardDescription>
+        <CardHeader className="p-4 sm:p-6">
+          <CardTitle className="text-lg sm:text-xl">Notification Settings</CardTitle>
+          <CardDescription className="text-xs sm:text-sm">Configure how you receive notifications</CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between p-3 border border-[var(--color-border)] rounded-lg bg-[var(--color-card)]">
-              <div>
-                <h3 className="font-medium text-[var(--color-text)]">Email Notifications</h3>
-                <p className="text-sm text-[var(--color-text-secondary)]">Receive notifications via email</p>
+        <CardContent className="p-4 sm:p-6 pt-0">
+          <div className="space-y-3 sm:space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 sm:p-4 border border-[var(--color-border)] rounded-lg bg-[var(--color-card)]">
+              <div className="min-w-0 flex-1">
+                <h3 className="font-medium text-sm sm:text-base text-[var(--color-text)]">Email Notifications</h3>
+                <p className="text-xs sm:text-sm text-[var(--color-text-secondary)]">Receive notifications via email</p>
               </div>
-              <Button variant="outline" size="sm">Configure</Button>
+              <Button variant="outline" size="sm" className="w-full sm:w-auto text-xs sm:text-sm">Configure</Button>
             </div>
-            <div className="flex items-center justify-between p-3 border border-[var(--color-border)] rounded-lg bg-[var(--color-card)]">
-              <div>
-                <h3 className="font-medium text-[var(--color-text)]">Push Notifications</h3>
-                <p className="text-sm text-[var(--color-text-secondary)]">Receive push notifications in browser</p>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 sm:p-4 border border-[var(--color-border)] rounded-lg bg-[var(--color-card)]">
+              <div className="min-w-0 flex-1">
+                <h3 className="font-medium text-sm sm:text-base text-[var(--color-text)]">Push Notifications</h3>
+                <p className="text-xs sm:text-sm text-[var(--color-text-secondary)]">Receive push notifications in browser</p>
               </div>
-              <Button variant="outline" size="sm">Configure</Button>
+              <Button variant="outline" size="sm" className="w-full sm:w-auto text-xs sm:text-sm">Configure</Button>
             </div>
-            <div className="flex items-center justify-between p-3 border border-[var(--color-border)] rounded-lg bg-[var(--color-card)]">
-              <div>
-                <h3 className="font-medium text-[var(--color-text)]">SMS Notifications</h3>
-                <p className="text-sm text-[var(--color-text-secondary)]">Receive critical alerts via SMS</p>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 sm:p-4 border border-[var(--color-border)] rounded-lg bg-[var(--color-card)]">
+              <div className="min-w-0 flex-1">
+                <h3 className="font-medium text-sm sm:text-base text-[var(--color-text)]">SMS Notifications</h3>
+                <p className="text-xs sm:text-sm text-[var(--color-text-secondary)]">Receive critical alerts via SMS</p>
               </div>
-              <Button variant="outline" size="sm">Configure</Button>
+              <Button variant="outline" size="sm" className="w-full sm:w-auto text-xs sm:text-sm">Configure</Button>
             </div>
           </div>
         </CardContent>
