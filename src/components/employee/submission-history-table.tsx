@@ -145,7 +145,7 @@ export function SubmissionHistoryTable() {
       return <Badge variant="destructive" className="bg-red-500 hover:bg-red-600 text-white"><XCircle className="w-3 h-3 mr-1"/>Rejected</Badge>;
     }
     if (receipt.status === 'draft' || receipt.isDraft) {
-      return <Badge variant="outline" className={receipt.managerNotes?.includes('Request for more information') ? "border-orange-500 text-orange-600" : "border-gray-500 text-gray-600"}><Edit3 className="w-3 h-3 mr-1"/>{receipt.managerNotes?.includes('Request for more information') ? 'Needs Revision' : 'Draft'}</Badge>;
+      return <Badge variant="outline" className={receipt.managerNotes?.includes('Request for more information') ? "border-orange-500 text-orange-600" : "border-gray-500 text-gray-600"}><Edit3 className="w-3 h-3 mr-1"/>{receipt.managerNotes?.includes('Request for more information') ? 'Needs More Info' : 'Draft'}</Badge>;
     }
     if (receipt.status === 'pending_approval') {
       return <Badge variant="secondary" className="bg-blue-100 text-blue-700 border-blue-200"><ShieldQuestion className="w-3 h-3 mr-1"/>Pending Review</Badge>;

@@ -222,6 +222,14 @@ export default function VerifyReceiptPage() {
     e.preventDefault();
     if (!receipt) return;
 
+    if (user?.role === 'employee' && (receipt.status === 'approved' || receipt.status === 'rejected')) {
+      toast({
+        title: 'Receipt Already Reviewed',
+        description: `This receipt has been ${receipt.status}. You cannot resubmit it for analysis.`,
+      });
+      return;
+    }
+
     const needsAttention = editableItems.some(item =>
         (item.label.toLowerCase().includes("vendor") || item.label.toLowerCase().includes("date") || item.label.toLowerCase().includes("total amount")) &&
         (item.value.toLowerCase().includes("extraction failed") || item.value.toLowerCase().includes("not found - edit me") || item.value.trim() === "")
@@ -433,7 +441,12 @@ export default function VerifyReceiptPage() {
 
   const isExtractionEssentiallyFailed = editableItems.length > 0 && editableItems.every(item => item.value.toLowerCase().includes("extraction failed") || item.value.toLowerCase().includes("not found - edit me"));
   const pageTitle = user?.role === 'manager' ? `Review & Edit Receipt: ${receipt.fileName}` : `Verify Receipt Data: ${receipt.fileName}`;
-  const submitButtonText = user?.role === 'manager' ? 'Save Changes & Re-analyze' : 'Confirm & Analyze Fraud';
+  const isEmployeeFinalized = user?.role === 'employee' && (receipt.status === 'approved' || receipt.status === 'rejected');
+  const submitButtonText = user?.role === 'manager'
+    ? 'Save Changes & Re-analyze'
+    : isEmployeeFinalized
+      ? 'Analysis Locked'
+      : 'Confirm & Analyze Fraud';
   const imageSource = receipt.imageUrl || receipt.imageDataUri;
   const isPdf = imageSource?.startsWith('data:application/pdf') || receipt.fileName.toLowerCase().endsWith('.pdf');
 
@@ -546,7 +559,15 @@ export default function VerifyReceiptPage() {
           <Button type="button" variant="outline" onClick={() => router.push(user?.role === 'manager' ? '/manager/dashboard' : '/employee/dashboard')} disabled={isProcessing}>
             Cancel
           </Button>
-          <Button type="submit" disabled={isProcessing || editableItems.length === 0 || editableItems.filter(item => item.label !== "Note").length === 0}>
+          <Button
+            type="submit"
+            disabled={
+              isProcessing ||
+              editableItems.length === 0 ||
+              editableItems.filter(item => item.label !== "Note").length === 0 ||
+              isEmployeeFinalized
+            }
+          >
             {isProcessing ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (
@@ -555,6 +576,11 @@ export default function VerifyReceiptPage() {
             {isProcessing ? 'Processing...' : submitButtonText}
           </Button>
         </CardFooter>
+        {isEmployeeFinalized && (
+          <div className="px-6 pb-6 text-xs text-muted-foreground text-right">
+            This receipt has already been {receipt.status} and cannot be re-analyzed.
+          </div>
+        )}
       </form>
     </Card>
   );

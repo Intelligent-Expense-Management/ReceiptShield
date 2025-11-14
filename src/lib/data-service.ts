@@ -700,39 +700,22 @@ function categorizeByMerchant(merchant: string): string {
 // Helper function to get user vs average comparison
 async function getUserVsAverageComparison(userEmail: string, userReceipts: ProcessedReceipt[]): Promise<{ userSpent: number; averageSpent: number; period: string }> {
   try {
-    // Calculate user's current month spending
-    const currentMonth = new Date().getMonth();
-    const currentYear = new Date().getFullYear();
+    // Calculate user's all-time spending (to match Total Amount card)
+    const userTotalSpent = userReceipts.reduce((sum, receipt) => {
+      return sum + getReceiptTotalAmount(receipt);
+    }, 0);
     
-    const userCurrentMonthSpent = userReceipts
-      .filter(receipt => {
-        const receiptDate = new Date(receipt.uploadedAt);
-        return receiptDate.getMonth() === currentMonth && receiptDate.getFullYear() === currentYear;
-      })
-      .reduce((sum, receipt) => {
-        return sum + receipt.items.reduce((itemSum, item) => {
-          const priceMatch = item.value.match(/\$?(\d+\.?\d*)/);
-          return itemSum + (priceMatch ? parseFloat(priceMatch[1]) : 0);
-        }, 0);
-      }, 0);
-    
-    // Get all receipts for current month to calculate average
+    // Get all receipts to calculate average (all-time)
     const allReceipts = await getAllReceipts();
-    const currentMonthReceipts = allReceipts.filter(receipt => {
-      const receiptDate = new Date(receipt.uploadedAt);
-      return receiptDate.getMonth() === currentMonth && receiptDate.getFullYear() === currentYear;
-    });
     
-    // Group by user and calculate average
+    // Group by user and calculate average (all-time)
     const userSpendingMap: { [email: string]: number } = {};
-    currentMonthReceipts.forEach(receipt => {
+    allReceipts.forEach(receipt => {
       const email = receipt.uploadedBy;
-      const amount = receipt.items.reduce((sum, item) => {
-        const priceMatch = item.value.match(/\$?(\d+\.?\d*)/);
-        return sum + (priceMatch ? parseFloat(priceMatch[1]) : 0);
-      }, 0);
-      
-      userSpendingMap[email] = (userSpendingMap[email] || 0) + amount;
+      if (email) {
+        const amount = getReceiptTotalAmount(receipt);
+        userSpendingMap[email] = (userSpendingMap[email] || 0) + amount;
+      }
     });
     
     const userSpendingArray = Object.values(userSpendingMap);
@@ -741,16 +724,16 @@ async function getUserVsAverageComparison(userEmail: string, userReceipts: Proce
       : 0;
     
     return {
-      userSpent: userCurrentMonthSpent,
+      userSpent: userTotalSpent,
       averageSpent,
-      period: 'current_month'
+      period: 'all_time'
     };
   } catch (error) {
     console.error('Error calculating user vs average:', error);
     return {
       userSpent: 0,
       averageSpent: 0,
-      period: 'current_month'
+      period: 'all_time'
     };
   }
 }

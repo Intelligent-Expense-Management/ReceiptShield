@@ -120,11 +120,26 @@ function formatMonth(monthString: string): string {
 
 function calculateTrend(data: { month: string; amount: number }[]): number {
   if (data.length < 2) return 0;
-  
-  const firstAmount = data[0].amount;
-  const lastAmount = data[data.length - 1].amount;
-  
-  if (firstAmount === 0) return 0;
-  
-  return ((lastAmount - firstAmount) / firstAmount) * 100;
+
+  const latestAmount = data[data.length - 1].amount;
+
+  // Find the most recent month before the latest with a recorded amount (including zero)
+  let comparisonAmount: number | null = null;
+  for (let i = data.length - 2; i >= 0; i--) {
+    const amount = data[i].amount;
+    if (amount !== null && amount !== undefined) {
+      comparisonAmount = amount;
+      break;
+    }
+  }
+
+  if (comparisonAmount === null) {
+    return 0;
+  }
+
+  if (comparisonAmount === 0) {
+    return latestAmount === 0 ? 0 : 100;
+  }
+
+  return ((latestAmount - comparisonAmount) / comparisonAmount) * 100;
 }
