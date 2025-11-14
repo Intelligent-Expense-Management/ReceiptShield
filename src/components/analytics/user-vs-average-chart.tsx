@@ -102,7 +102,7 @@ export function UserVsAverageChart({ data, className }: UserVsAverageChartProps)
                 <span className="text-sm font-medium text-blue-900">Your Spending</span>
               </div>
               <p className="text-2xl font-bold text-blue-600">${userSpent.toFixed(2)}</p>
-              <p className="text-xs text-blue-700 capitalize">{period.replace('_', ' ')}</p>
+              <p className="text-xs text-blue-700">{period === 'all_time' ? 'All Time' : period.replace('_', ' ')}</p>
             </div>
             
             <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
@@ -111,7 +111,7 @@ export function UserVsAverageChart({ data, className }: UserVsAverageChartProps)
                 <span className="text-sm font-medium text-gray-900">Company Average</span>
               </div>
               <p className="text-2xl font-bold text-gray-600">${averageSpent.toFixed(2)}</p>
-              <p className="text-xs text-gray-700 capitalize">{period.replace('_', ' ')}</p>
+              <p className="text-xs text-gray-700">{period === 'all_time' ? 'All Time' : period.replace('_', ' ')}</p>
             </div>
           </div>
 
@@ -138,7 +138,7 @@ export function UserVsAverageChart({ data, className }: UserVsAverageChartProps)
                 }`}>
                   You are spending {Math.abs(percentageDiff).toFixed(1)}% {
                     isAboveAverage ? 'more' : 'less'
-                  } than the company average this {period.replace('_', ' ')}.
+                  } than the company average {period === 'all_time' ? 'overall' : `this ${period.replace('_', ' ')}`}.
                   {isAboveAverage && (
                     <span className="block mt-1">
                       Consider reviewing your expenses to align with company norms.
