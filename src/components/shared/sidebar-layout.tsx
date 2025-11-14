@@ -38,7 +38,7 @@ export function SidebarLayout({ children, className, userRole = "employee", user
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Top Navigation */}
-        <header className="bg-[var(--color-card)] border-b border-[var(--color-border)] px-4 py-3 flex items-center justify-between" style={{ paddingTop: 'max(calc(0.75rem + env(safe-area-inset-top)), 0.75rem)' }}>
+        <header className="sticky top-0 z-50 bg-[var(--color-card)] border-b border-[var(--color-border)] px-4 py-3 flex items-center justify-between" style={{ paddingTop: 'max(calc(0.75rem + env(safe-area-inset-top)), 0.75rem)' }}>
           <div className="flex items-center space-x-4">
             <MobileMenuButton onClick={toggleMobile} />
             <h1 className="text-lg font-semibold text-[var(--color-text)]">
@@ -47,14 +47,6 @@ export function SidebarLayout({ children, className, userRole = "employee", user
           </div>
 
           <div className="flex items-center space-x-4">
-            {/* Notifications */}
-            <button className="relative p-2 text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg-secondary)] rounded-lg">
-              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-5 5v-5zM4 19h6v-6H4v6z" />
-              </svg>
-              <span className="absolute top-1 right-1 h-2 w-2 bg-red-500 rounded-full"></span>
-            </button>
-
             {/* User Menu */}
             <div className="flex items-center space-x-3">
               <div className="text-right">
