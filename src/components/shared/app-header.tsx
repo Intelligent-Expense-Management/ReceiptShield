@@ -12,7 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { UserCircle, Shield, UserCog, KeyRound, ChevronDown, Bot, LogOut, Building2 } from 'lucide-react';
+import { UserCircle, Shield, UserCog, KeyRound, ChevronDown, Bell, Bot, LogOut, Building2 } from 'lucide-react';
 import Link from 'next/link';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { ThemeToggle } from '@/components/shared/theme-toggle';
@@ -63,6 +63,10 @@ export default function AppHeader({ onChatbotClick }: { onChatbotClick?: () => v
             <Button variant="ghost" size="icon" className="rounded-full" onClick={onChatbotClick}>
               <Bot className="h-5 w-5" />
               <span className="sr-only">AI Assistant</span>
+            </Button>
+            <Button variant="ghost" size="icon" className="rounded-full">
+              <Bell className="h-5 w-5" />
+              <span className="sr-only">Notifications</span>
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
