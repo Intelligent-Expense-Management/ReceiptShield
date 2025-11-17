@@ -33,18 +33,9 @@ import fs from 'fs/promises';
 import path from 'path';
 import 'dotenv/config';
 import sharp from 'sharp';
-import { promisify } from 'util';
+import Tesseract from 'tesseract.js';
 import { summarizeReceipt } from '../src/ai/flows/summarize-receipt';
 import { createObjectCsvWriter } from 'csv-writer';
-import { extractTextWithTesseract } from '../src/lib/tesseract-ocr-service';
-import type { ReceiptDataItem } from '../src/types';
-
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const imageHashCallback = require('image-hash');
-const imageHash = promisify(
-  (imagePath: string, bits: number, greedy: boolean, callback: (error: Error | null, hash?: string) => void) =>
-    imageHashCallback(imagePath, bits, greedy, callback)
-);
 
 const RECEIPTS_DIR = path.resolve(__dirname, './receipts');
 const OUTPUT_CSV   = path.resolve(__dirname, './receipts_dataset.csv');
@@ -103,49 +94,29 @@ function extractFlatFeatures(items: { label: string; value: string }[]) {
   };
 }
 
-async function getPerceptualHash(filePath: string): Promise<string> {
-  try {
-    const hash = await imageHash(filePath, 16, true);
-    if (typeof hash === 'string' && hash.length > 0) {
-      return hash.toLowerCase();
+/** simple hash based on filename and size */
+function hashImage(filePath: string): Promise<string> {
+  return new Promise(async (res) => {
+    try {
+      const stats = await fs.stat(filePath);
+      const fileName = path.basename(filePath);
+      const simpleHash = Buffer.from(`${fileName}_${stats.size}`).toString('base64').slice(0, 16);
+      res(simpleHash);
+    } catch (err) {
+      // Fallback to filename hash
+      const fileName = path.basename(filePath);
+      const fallbackHash = Buffer.from(fileName).toString('base64').slice(0, 16);
+      res(fallbackHash);
     }
-  } catch (error) {
-    console.warn(`⚠️ image-hash failed for ${filePath}, falling back to simple hash`, error);
-  }
-
-  const stats = await fs.stat(filePath);
-  const fileName = path.basename(filePath);
-  return Buffer.from(`${fileName}_${stats.size}`).toString('hex').slice(0, 16);
+  });
 }
 
-const NIBBLE_BIT_COUNTS = [0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4] as const;
-
-/** Calculate Hamming distance between two hexadecimal hashes */
+/** Calculate Hamming distance between two hashes */
 function hammingDistance(hash1: string, hash2: string): number {
-  if (!hash1 || !hash2) {
-    return Number.POSITIVE_INFINITY;
+  let distance = 0;
+  for (let i = 0; i < hash1.length; i++) {
+    if (hash1[i] !== hash2[i]) distance++;
   }
-
-  const normalized1 = hash1.trim().toLowerCase();
-  const normalized2 = hash2.trim().toLowerCase();
-
-  const maxLength = Math.min(normalized1.length, normalized2.length);
-  let distance = Math.abs(normalized1.length - normalized2.length) * 4; // each missing nibble adds 4 bits
-
-  for (let i = 0; i < maxLength; i += 1) {
-    const nibbleA = parseInt(normalized1[i], 16);
-    const nibbleB = parseInt(normalized2[i], 16);
-
-    if (Number.isNaN(nibbleA) || Number.isNaN(nibbleB)) {
-      if (normalized1[i] !== normalized2[i]) {
-        distance += 1;
-      }
-      continue;
-    }
-
-    distance += NIBBLE_BIT_COUNTS[nibbleA ^ nibbleB];
-  }
-
   return distance;
 }
 
@@ -176,6 +147,12 @@ async function blurScore(filePath: string): Promise<number> {
   const mean    = sum / n;
   const variance = sumSq / n - mean * mean;
   return variance;
+}
+
+/** OCR for keyword search & fallback totals */
+async function ocrText(filePath: string): Promise<string> {
+  const { data: { text } } = await Tesseract.recognize(filePath, 'eng', { logger: () => {} });
+  return text.toLowerCase();
 }
 
 function findPersonalKeyword(text: string): boolean {
@@ -266,47 +243,9 @@ async function getAllImagePaths(): Promise<EntryMeta[]> {
   return entries;
 }
 
-function mergeReceiptItems(primary: ReceiptDataItem[], fallback: ReceiptDataItem[]): ReceiptDataItem[] {
-  if (!primary.length) {
-    return fallback;
-  }
-
-  if (!fallback.length) {
-    return primary;
-  }
-
-  const merged = [...primary];
-  const labelIndexMap = new Map<string, number>();
-
-  merged.forEach((item, index) => {
-    labelIndexMap.set(item.label.toLowerCase(), index);
-  });
-
-  fallback.forEach((item) => {
-    const normalizedLabel = item.label.toLowerCase();
-    const value = item.value?.trim();
-    if (!value) {
-      return;
-    }
-
-    if (!labelIndexMap.has(normalizedLabel)) {
-      merged.push(item);
-      labelIndexMap.set(normalizedLabel, merged.length - 1);
-      return;
-    }
-
-    const existingIndex = labelIndexMap.get(normalizedLabel)!;
-    if (!merged[existingIndex].value?.trim()) {
-      merged[existingIndex] = item;
-    }
-  });
-
-  return merged;
-}
-
 async function run() {
   const imageEntries = await getAllImagePaths();
-  const perceptualHashes: Array<{ receiptId: string; hash: string }> = [];
+  const hashMap = new Map<string, string[]>(); // For duplicate detection
 
   const csvWriter = createObjectCsvWriter({
     path: OUTPUT_CSV,
@@ -361,30 +300,16 @@ async function run() {
   for (const { path: filePath, isFraud, userId } of imageEntries) {
     try {
       // 1️⃣ computer‑vision & OCR
-      const [hash, blur] = await Promise.all([
-        getPerceptualHash(filePath),
+      const [hash, blur, ocr] = await Promise.all([
+        hashImage(filePath),
         blurScore(filePath),
+        ocrText(filePath)
       ]);
 
-      const photoDataUri = await imageToDataURI(filePath);
-
-      const [tesseractResult, aiSummary] = await Promise.all([
-        extractTextWithTesseract(photoDataUri),
-        summarizeReceipt({ photoDataUri }),
-      ]);
-
-      let combinedItems: ReceiptDataItem[] = aiSummary.items;
-      if (!combinedItems.length && tesseractResult.items.length) {
-        combinedItems = tesseractResult.items;
-      } else if (combinedItems.length && tesseractResult.items.length) {
-        combinedItems = mergeReceiptItems(aiSummary.items, tesseractResult.items);
-      }
-
-      const flat = extractFlatFeatures(combinedItems);
-      const ocr = (tesseractResult.text || '').toLowerCase();
-      const confidenceScore = Number.isFinite(tesseractResult.confidence)
-        ? +Math.max(0, Math.min(1, tesseractResult.confidence)).toFixed(4)
-        : 0;
+      // 2️⃣ AI extraction (same as before)
+      const photoDataUri   = await imageToDataURI(filePath);
+      const { items }      = await summarizeReceipt({ photoDataUri });
+      const flat           = extractFlatFeatures(items);
 
       // 3️⃣ derived fields and fraud detection
       const personal_item = findPersonalKeyword(ocr);
@@ -397,7 +322,12 @@ async function run() {
       const timestamp = extractTimestamp(filePath, ocr);
       const location_data = extractLocationData(filePath);
       
-      perceptualHashes.push({ receiptId: receipt_id, hash });
+      // Duplicate detection
+      const hashKey = hash.substring(0, 8); // Use first 8 chars for grouping
+      if (!hashMap.has(hashKey)) {
+        hashMap.set(hashKey, []);
+      }
+      hashMap.get(hashKey)!.push(receipt_id);
       
       // Same vendor multiple users detection
       if (flat.vendor_name) {
@@ -414,7 +344,7 @@ async function run() {
         image_hash: hash,
         blur_score: +blur.toFixed(2),
         ocr_text: ocr.replace(/\s+/g, ' ').slice(0, 5000), // keep CSV small
-        confidence_score: confidenceScore,
+        confidence_score: 0.85, // Placeholder - implement based on AI confidence
         latitude: location_data.latitude || null,
         longitude: location_data.longitude || null,
         location_name: location_data.location_name || '',
@@ -438,19 +368,11 @@ async function run() {
 
   // Post-process for duplicate and same vendor detection
   for (const record of records) {
-    // Check for duplicates using perceptual hash Hamming distance
-    const hashEntry = perceptualHashes.find((entry) => entry.receiptId === record.receipt_id);
-    if (hashEntry) {
-      const isDuplicate = perceptualHashes.some((other) => {
-        if (other.receiptId === record.receipt_id) {
-          return false;
-        }
-        return hammingDistance(hashEntry.hash, other.hash) <= DUPLICATE_HASH_THRESHOLD;
-      });
-
-      if (isDuplicate) {
-        record.duplicate_receipt = 1;
-      }
+    // Check for duplicates
+    const hashKey = record.image_hash.substring(0, 8);
+    const similarReceipts = hashMap.get(hashKey) || [];
+    if (similarReceipts.length > 1) {
+      record.duplicate_receipt = 1;
     }
     
     // Check for same vendor multiple users
