@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
 import { uploadReceiptImage, fileToDataUri, testStorageConnectivity } from '@/lib/firebase-storage';
@@ -45,6 +45,7 @@ export default function ReceiptUploadForm() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [extractedItems, setExtractedItems] = useState<ReceiptDataItem[]>([]);
+  const [ocrConfidence, setOcrConfidence] = useState<number | null>(null);
   const [isOcrProcessing, setIsOcrProcessing] = useState(false);
   const [ocrProgress, setOcrProgress] = useState(0);
   const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
@@ -94,6 +95,7 @@ export default function ReceiptUploadForm() {
   const performOCRProcessing = async (imageDataUri: string) => {
     setIsOcrProcessing(true);
     setOcrProgress(0);
+    setOcrConfidence(null);
     
     try {
       console.log('🔍 Starting automatic OCR processing...');
@@ -103,13 +105,20 @@ export default function ReceiptUploadForm() {
         setOcrProgress(prev => Math.min(prev + 10, 90));
       }, 300);
 
-      const ocrResult = await extractTextWithTesseract(imageDataUri);
+      const rawOcrResult = await extractTextWithTesseract(imageDataUri);
+      const ocrResult = {
+        text: rawOcrResult?.text ?? '',
+        items: Array.isArray(rawOcrResult?.items) ? rawOcrResult.items : [],
+        confidence: rawOcrResult?.confidence ?? 0,
+        processingTime: rawOcrResult?.processingTime ?? 0,
+      };
       
       clearInterval(progressInterval);
       setOcrProgress(100);
 
       // Update extracted items
       setExtractedItems(ocrResult.items);
+      setOcrConfidence(ocrResult.confidence ?? null);
       
       console.log('✅ OCR completed:', {
         itemsCount: ocrResult.items.length,
@@ -120,6 +129,7 @@ export default function ReceiptUploadForm() {
     } catch (error) {
       console.error('❌ OCR processing failed:', error);
       setError('OCR processing failed. You can still proceed with manual entry.');
+      setOcrConfidence(null);
     } finally {
       setIsOcrProcessing(false);
       setOcrProgress(0);
@@ -215,6 +225,8 @@ export default function ReceiptUploadForm() {
         // Fallback to enhanced OCR service
         ocrResult = await performEnhancedOCRAnalysis(uploadResult.url, undefined, receiptId);
       }
+
+      setOcrConfidence(typeof ocrResult.ocrConfidence === 'number' ? ocrResult.ocrConfidence : null);
       
       updateStep('ocr', 'completed', 100);
       setUploadProgress(50);
@@ -511,6 +523,7 @@ export default function ReceiptUploadForm() {
     setError(null);
     setUploadProgress(0);
     setExtractedItems([]);
+    setOcrConfidence(null);
     setIsOcrProcessing(false);
     setOcrProgress(0);
     setUploadSteps(prev => prev.map(step => ({ ...step, status: 'pending', progress: 0 })));
@@ -518,6 +531,37 @@ export default function ReceiptUploadForm() {
       fileInputRef.current.value = '';
     }
   };
+
+  const confidenceMeta = useMemo(() => {
+    if (ocrConfidence === null) {
+      return null;
+    }
+
+    if (ocrConfidence >= 0.8) {
+      return {
+        bg: 'bg-green-50',
+        border: 'border-green-200',
+        text: 'text-green-700',
+        message: 'OCR looks accurate. Please spot-check key fields.'
+      };
+    }
+
+    if (ocrConfidence >= 0.6) {
+      return {
+        bg: 'bg-amber-50',
+        border: 'border-amber-200',
+        text: 'text-amber-700',
+        message: 'Moderate confidence. Review totals before submitting.'
+      };
+    }
+
+    return {
+      bg: 'bg-red-50',
+      border: 'border-red-200',
+      text: 'text-red-700',
+      message: 'Low confidence. Manual verification recommended.'
+    };
+  }, [ocrConfidence]);
 
   return (
     <div className="max-w-2xl mx-auto p-6">
@@ -611,6 +655,15 @@ export default function ReceiptUploadForm() {
                 </div>
               ) : extractedItems.length > 0 ? (
                 <div className="space-y-3">
+                  {confidenceMeta && (
+                    <div className="space-y-1">
+                      <div className={`flex items-center justify-between rounded-md border px-3 py-2 text-sm ${confidenceMeta.bg} ${confidenceMeta.border} ${confidenceMeta.text}`}>
+                        <span className="font-medium">OCR Confidence</span>
+                        <span>{Math.round((ocrConfidence ?? 0) * 100)}%</span>
+                      </div>
+                      <p className={`text-xs ${confidenceMeta.text}`}>{confidenceMeta.message}</p>
+                    </div>
+                  )}
                   <div className="grid gap-2">
                     {extractedItems.map((item, index) => (
                       <div key={`${item.id}-${index}`} className="flex justify-between items-center p-2 bg-gray-50 rounded border">
