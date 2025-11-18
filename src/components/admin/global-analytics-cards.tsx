@@ -15,7 +15,9 @@ export function GlobalAnalyticsCards() {
         totalExpenses: 0,
         totalReceipts: 0,
         totalFraudAlerts: 0,
-        totalUsers: 0
+        totalUsers: 0,
+        fraudRate: 0,
+        fraudByStatus: null as { pending: number; approved: number; rejected: number } | null,
     });
     const [loading, setLoading] = useState(true);
 
@@ -27,7 +29,9 @@ export function GlobalAnalyticsCards() {
                     totalExpenses: 0,
                     totalReceipts: 0,
                     totalFraudAlerts: 0,
-                    totalUsers: 0
+                    totalUsers: 0,
+                    fraudRate: 0,
+                    fraudByStatus: null,
                 });
                 setLoading(false);
                 return;
@@ -53,12 +57,24 @@ export function GlobalAnalyticsCards() {
                 }, 0);
 
                 const totalFraudAlerts = allReceipts.filter(r => r.isFraudulent).length;
+                const fraudRate = allReceipts.length > 0 
+                    ? (totalFraudAlerts / allReceipts.length) * 100 
+                    : 0;
+                
+                // Calculate fraud alerts by status for platform admins
+                const fraudByStatus = user?.isPlatformAdmin ? {
+                    pending: allReceipts.filter(r => r.isFraudulent && r.status === 'pending_approval').length,
+                    approved: allReceipts.filter(r => r.isFraudulent && r.status === 'approved').length,
+                    rejected: allReceipts.filter(r => r.isFraudulent && r.status === 'rejected').length,
+                } : null;
 
                 const newStats = {
                     totalExpenses,
                     totalReceipts: allReceipts.length,
                     totalFraudAlerts,
                     totalUsers: allUsers.length,
+                    fraudRate,
+                    fraudByStatus,
                 };
                 
                 console.log('📈 Final stats:', newStats);
@@ -71,7 +87,9 @@ export function GlobalAnalyticsCards() {
                     totalExpenses: 0,
                     totalReceipts: 0,
                     totalFraudAlerts: 0,
-                    totalUsers: 0
+                    totalUsers: 0,
+                    fraudRate: 0,
+                    fraudByStatus: null,
                 });
                 setLoading(false);
             }
@@ -127,14 +145,59 @@ export function GlobalAnalyticsCards() {
             </Card>
             <Card className="shadow-lg hover:shadow-xl transition-shadow duration-200 border-l-4 border-l-[var(--color-danger)] bg-[var(--color-card)] border-[var(--color-border)]">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium text-[var(--color-text)]">Global Fraud Alerts</CardTitle>
+                    <CardTitle className="text-sm font-medium text-[var(--color-text)]">
+                        {user?.isPlatformAdmin ? 'Fraud Detection Analytics' : 'Global Fraud Alerts'}
+                    </CardTitle>
                     <div className="p-2 bg-[var(--color-danger)]/10 rounded-lg">
                         <ShieldAlert className="h-4 w-4 text-[var(--color-danger)]" />
                     </div>
                 </CardHeader>
                 <CardContent>
-                    <div className="text-2xl font-bold text-[var(--color-danger)]">{stats.totalFraudAlerts}</div>
-                    <p className="text-xs text-[var(--color-text-secondary)]">Flagged for review</p>
+                    {user?.isPlatformAdmin ? (
+                        <div className="space-y-3">
+                            <div className="flex items-baseline gap-2">
+                                <div className="text-2xl font-bold text-[var(--color-danger)]">{stats.totalFraudAlerts}</div>
+                                <div className="text-sm font-medium text-[var(--color-text-secondary)]">
+                                    of {stats.totalReceipts} receipts
+                                </div>
+                            </div>
+                            <div className="space-y-1">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs text-[var(--color-text-secondary)]">Fraud Rate</span>
+                                    <span className="text-sm font-semibold text-[var(--color-danger)]">
+                                        {stats.fraudRate.toFixed(2)}%
+                                    </span>
+                                </div>
+                                {stats.fraudByStatus && (
+                                    <div className="pt-2 space-y-1 border-t border-[var(--color-border)]">
+                                        <div className="flex items-center justify-between text-xs">
+                                            <span className="text-[var(--color-text-secondary)]">Pending Review</span>
+                                            <span className="font-medium text-[var(--color-warning)]">
+                                                {stats.fraudByStatus.pending}
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center justify-between text-xs">
+                                            <span className="text-[var(--color-text-secondary)]">Approved</span>
+                                            <span className="font-medium text-[var(--color-success)]">
+                                                {stats.fraudByStatus.approved}
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center justify-between text-xs">
+                                            <span className="text-[var(--color-text-secondary)]">Rejected</span>
+                                            <span className="font-medium text-[var(--color-danger)]">
+                                                {stats.fraudByStatus.rejected}
+                                            </span>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    ) : (
+                        <>
+                            <div className="text-2xl font-bold text-[var(--color-danger)]">{stats.totalFraudAlerts}</div>
+                            <p className="text-xs text-[var(--color-text-secondary)]">Flagged for review</p>
+                        </>
+                    )}
                 </CardContent>
             </Card>
             <Card className="shadow-lg hover:shadow-xl transition-shadow duration-200 border-l-4 border-l-[var(--color-warning)] bg-[var(--color-card)] border-[var(--color-border)]">

@@ -35,6 +35,10 @@ export async function getMonitoringUser(request: NextRequest): Promise<Monitorin
       try {
         // Verify Firebase ID token
         const { auth } = await import('./firebase-admin');
+        if (!auth) {
+          console.error('Firebase Admin SDK not initialized');
+          return null;
+        }
         const decodedToken = await auth.verifyIdToken(token);
         return {
           id: decodedToken.uid,

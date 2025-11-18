@@ -22,16 +22,23 @@ export const runAssistant = async (
       }),
     });
 
+    // Parse response data (even for error statuses, as API may return helpful messages)
+    const data = await response.json().catch(() => ({}));
+
     if (!response.ok) {
-      // Handle rate limiting with a more specific error
+      // For 429 rate limits, return the helpful message from the API instead of throwing
       if (response.status === 429) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'RATE_LIMIT_EXCEEDED');
+        return {
+          response: data.response || "I'm currently experiencing high demand. Please wait a moment and try again in a few seconds. Rate limits help ensure fair access for all users.",
+          error: data.error || 'RATE_LIMIT_EXCEEDED',
+          suggestUpload: data.suggestUpload || false
+        };
       }
+      
+      // For other errors, throw to be caught by the catch block
       throw new Error(`API error: ${response.status}`);
     }
 
-    const data = await response.json();
     return data;
 
   } catch (error) {

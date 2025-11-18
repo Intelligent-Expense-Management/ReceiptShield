@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     let invitedBy = 'system-admin'; // Fallback if no auth token
     const authHeader = request.headers.get('authorization');
     
-    if (authHeader && authHeader.startsWith('Bearer ')) {
+    if (authHeader && authHeader.startsWith('Bearer ') && auth) {
       try {
         const token = authHeader.split('Bearer ')[1];
         const decodedToken = await auth.verifyIdToken(token);
