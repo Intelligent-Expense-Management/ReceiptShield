@@ -169,23 +169,23 @@ export default function EmployeeReceiptsPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-primary/5">
-      <div className="space-y-6 sm:space-y-8 px-4 sm:px-6 lg:px-8 py-4 sm:py-6 pb-24 sm:pb-6">
+      <div className="space-y-8 px-4 sm:px-6 lg:px-8 py-6">
         {/* Header */}
-        <div className="bg-card rounded-lg shadow-lg border p-4 sm:p-6">
-          <div className="flex items-center gap-3 sm:gap-4">
+        <div className="bg-card rounded-lg shadow-lg border p-6">
+          <div className="flex items-center gap-4">
             <Button
               variant="ghost"
               size="sm"
               onClick={() => router.back()}
-              className="p-2 flex-shrink-0"
+              className="p-2"
             >
               <ArrowLeft className="h-5 w-5" />
             </Button>
-            <div className="min-w-0 flex-1">
-              <h1 className="text-2xl sm:text-3xl font-headline font-bold tracking-tight text-foreground">
+            <div>
+              <h1 className="text-3xl font-headline font-bold tracking-tight text-foreground">
                 Receipt History
               </h1>
-              <p className="text-muted-foreground text-xs sm:text-sm">
+              <p className="text-muted-foreground text-sm">
                 View all your submitted receipts and their status
               </p>
             </div>
@@ -208,50 +208,45 @@ export default function EmployeeReceiptsPage() {
               </CardContent>
             </Card>
           ) : (
-            <div className="space-y-3 sm:space-y-4">
+            <div className="space-y-4">
               {receipts.map((receipt) => (
                 <Card key={receipt.id} className="shadow-lg hover:shadow-xl transition-shadow">
-                  <CardContent className="p-4 sm:p-6">
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                      <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
-                        <div className="p-2 sm:p-3 bg-primary/10 rounded-lg flex-shrink-0">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="p-3 bg-primary/10 rounded-lg">
                           {getStatusIcon(receipt)}
                         </div>
-                        <div className="space-y-1 min-w-0 flex-1">
-                          <h3 className="text-base sm:text-lg font-semibold text-foreground truncate">
+                        <div className="space-y-1">
+                          <h3 className="text-lg font-semibold text-foreground">
                             {receipt.fileName}
                           </h3>
-                          <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
-                            <Calendar className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                            <span>{format(new Date(receipt.uploadedAt), 'MMM dd, yyyy')}</span>
-                            <span className="hidden sm:inline">•</span>
-                            <span className="hidden sm:inline">{receipt.items?.length || 0} items</span>
-                          </div>
-                          <div className="sm:hidden text-xs text-muted-foreground">
-                            {receipt.items?.length || 0} items
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Calendar className="h-4 w-4" />
+                            {format(new Date(receipt.uploadedAt), 'MMM dd, yyyy')}
                           </div>
                         </div>
                       </div>
                       
-                      <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-4 flex-shrink-0">
-                        <div className="text-left sm:text-right">
-                          <div className="text-xl sm:text-2xl font-bold text-foreground">
+                      <div className="flex items-center gap-4">
+                        <div className="text-right">
+                          <div className="text-2xl font-bold text-foreground">
                             ${getTotalAmount(receipt).toFixed(2)}
                           </div>
-                          <div className="hidden sm:block text-sm text-muted-foreground">
+                          <div className="text-sm text-muted-foreground">
                             {receipt.items?.length || 0} items
                           </div>
                         </div>
                         
-                        <div className="flex flex-col sm:flex-col items-end gap-2">
+                        <div className="flex flex-col items-end gap-2">
                           {getStatusBadge(receipt)}
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => router.push(`/employee/verify-receipt/${receipt.id}`)}
-                            className="flex items-center gap-2 text-xs sm:text-sm"
+                            className="flex items-center gap-2"
                           >
-                            <Eye className="h-3 w-3 sm:h-4 sm:w-4" />
+                            <Eye className="h-4 w-4" />
                             View
                           </Button>
                         </div>
@@ -267,33 +262,33 @@ export default function EmployeeReceiptsPage() {
         {/* Summary Stats */}
         {receipts.length > 0 && (
           <Card className="shadow-lg border-l-4 border-l-blue-500">
-            <CardHeader className="p-4 sm:p-6">
-              <CardTitle className="text-lg sm:text-xl">Summary</CardTitle>
-              <CardDescription className="text-xs sm:text-sm">Overview of your receipt submissions</CardDescription>
+            <CardHeader>
+              <CardTitle className="text-xl">Summary</CardTitle>
+              <CardDescription>Overview of your receipt submissions</CardDescription>
             </CardHeader>
-            <CardContent className="p-4 sm:p-6 pt-0">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="text-center">
-                  <div className="text-xl sm:text-2xl font-bold text-foreground">{receipts.length}</div>
-                  <div className="text-xs sm:text-sm text-muted-foreground">Total Receipts</div>
+                  <div className="text-2xl font-bold text-foreground">{receipts.length}</div>
+                  <div className="text-sm text-muted-foreground">Total Receipts</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-xl sm:text-2xl font-bold text-green-600">
+                  <div className="text-2xl font-bold text-green-600">
                     {receipts.filter(r => r.status === 'approved').length}
                   </div>
-                  <div className="text-xs sm:text-sm text-muted-foreground">Approved</div>
+                  <div className="text-sm text-muted-foreground">Approved</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-xl sm:text-2xl font-bold text-orange-600">
+                  <div className="text-2xl font-bold text-orange-600">
                     {receipts.filter(r => r.status === 'pending_approval').length}
                   </div>
-                  <div className="text-xs sm:text-sm text-muted-foreground">Pending</div>
+                  <div className="text-sm text-muted-foreground">Pending</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-xl sm:text-2xl font-bold text-foreground">
+                  <div className="text-2xl font-bold text-foreground">
                     ${receipts.reduce((acc, r) => acc + getTotalAmount(r), 0).toFixed(2)}
                   </div>
-                  <div className="text-xs sm:text-sm text-muted-foreground">Total Amount</div>
+                  <div className="text-sm text-muted-foreground">Total Amount</div>
                 </div>
               </div>
             </CardContent>
