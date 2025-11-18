@@ -251,7 +251,7 @@ export function ModernSidebar({
             if (analyzeReceiptForFraud(receipt, allReceipts)) {
               // Only include if status is pending_approval or not yet resolved
               const status = receipt.status || 'pending_approval';
-              if (status === 'pending_approval' || status === 'pending' || !['approved', 'rejected', 'resolved'].includes(status)) {
+              if (status === 'pending_approval' || !['approved', 'rejected', 'resolved'].includes(status)) {
                 fraudAlerts.push(receipt);
               }
             }

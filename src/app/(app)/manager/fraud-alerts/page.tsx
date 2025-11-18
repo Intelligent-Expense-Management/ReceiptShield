@@ -403,7 +403,7 @@ export default function ManagerFraudAlertsPage() {
         if (analysis.isFraudulent) {
           // Only include if status is pending_approval or not yet resolved
           const status = receipt.status || 'pending_approval';
-          if (status === 'pending_approval' || status === 'pending' || !['approved', 'rejected', 'resolved'].includes(status)) {
+          if (status === 'pending_approval' || !['approved', 'rejected', 'resolved'].includes(status)) {
             const alert = convertReceiptToAlert(receipt, allReceipts);
             fraudAlerts.push(alert);
           }
