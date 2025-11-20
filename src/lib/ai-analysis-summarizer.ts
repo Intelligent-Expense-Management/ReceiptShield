@@ -34,9 +34,10 @@ export function summarizeAIAnalysis(explanation: string | undefined | null): str
     }
   }
 
-  // Truncate if too long (keep first 500 characters)
-  if (cleaned.length > 500) {
-    cleaned = cleaned.substring(0, 500) + '...';
+  // Truncate if too long (keep first 300 characters for concise display)
+  // Since AI now generates shorter explanations, this is mainly a safety net
+  if (cleaned.length > 300) {
+    cleaned = cleaned.substring(0, 300) + '...';
   }
 
   return cleaned.trim();

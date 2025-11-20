@@ -167,10 +167,16 @@ Provide your analysis in the following JSON format:
 {
   "fraudulent": boolean,
   "fraudProbability": number (0-1),
-  "explanation": "Detailed explanation of your findings, including specific fraud indicators if found, or confirmation that the receipt appears legitimate",
+  "explanation": "A concise, readable summary (2-4 sentences maximum) written for employees and managers. Use plain language, avoid technical jargon. If fraud is detected, briefly state the main concern. If clear, simply confirm the receipt appears legitimate. Keep it under 200 words.",
   "riskFactors": ["list of specific risk factors identified"],
   "confidence": number (0-1)
 }
+
+IMPORTANT: The explanation must be:
+- Short and concise (2-4 sentences, under 200 words)
+- Written in plain language for non-technical readers (employees/managers)
+- Focused on the key finding only
+- Professional and clear
 
 Be thorough but fair. Only flag as fraudulent if you identify clear indicators.` },
     ];
@@ -228,7 +234,7 @@ Be thorough but fair. Only flag as fraudulent if you identify clear indicators.`
         temperature: 0.3,
         topK: 40,
         topP: 0.95,
-        maxOutputTokens: 4096, // Increased from 1024 to allow complete fraud analysis responses
+        maxOutputTokens: 512, // Reduced to encourage concise, readable explanations for employees/managers
       },
     };
 
