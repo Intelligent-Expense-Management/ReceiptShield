@@ -16,6 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import { extractTextWithTesseract } from '@/lib/tesseract-ocr-service';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/contexts/auth-context'; // Import useAuth
+import { summarizeAIAnalysis } from '@/lib/ai-analysis-summarizer';
 
 export default function VerifyReceiptPage() {
   const params = useParams();
@@ -316,10 +317,13 @@ export default function VerifyReceiptPage() {
 
         if (aiResponse.ok) {
           const aiData = await aiResponse.json();
+          // Process explanation to ensure it's concise and readable
+          const rawExplanation = aiData.explanation ?? 'AI analysis completed. No fraud indicators detected.';
+          const conciseExplanation = summarizeAIAnalysis(rawExplanation);
           aiDetection = {
             fraudulent: aiData.fraudulent ?? false,
             fraudProbability: aiData.fraudProbability ?? 0.1,
-            explanation: aiData.explanation ?? 'AI analysis completed. No fraud indicators detected.',
+            explanation: conciseExplanation,
           };
           console.log('✅ AI analysis received:', aiDetection);
         } else {

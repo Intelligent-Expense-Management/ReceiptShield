@@ -16,6 +16,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Upload, FileImage, CheckCircle, AlertCircle, Loader2, X, ArrowUpCircle } from 'lucide-react';
 import type { ProcessedReceipt, ReceiptDataItem } from '@/types';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { summarizeAIAnalysis } from '@/lib/ai-analysis-summarizer';
 
 // Debug build tag to verify deployment contents in Chrome DevTools
 const RECEIPT_UPLOAD_FORM_BUILD_TAG = 'RUF-DEBUG-2025-10-29T00:00Z';
@@ -295,10 +296,13 @@ export default function ReceiptUploadForm() {
 
             if (aiResponse.ok) {
               const aiData = await aiResponse.json();
+              // Process explanation to ensure it's concise and readable
+              const rawExplanation = aiData.explanation || 'AI analysis completed. No fraud indicators detected.';
+              const conciseExplanation = summarizeAIAnalysis(rawExplanation);
               aiDetection = {
                 fraudulent: aiData.fraudulent || false,
                 fraudProbability: aiData.fraudProbability || 0.1,
-                explanation: aiData.explanation || 'AI analysis completed. No fraud indicators detected.',
+                explanation: conciseExplanation,
                 riskFactors: aiData.riskFactors || [],
                 confidence: aiData.confidence || 0.7
               };
