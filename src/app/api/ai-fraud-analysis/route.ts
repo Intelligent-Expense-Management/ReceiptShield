@@ -79,11 +79,22 @@ export async function POST(request: NextRequest) {
       console.warn("⚠️ Error listing models:", listError);
     }
 
-    // Prepare receipt data text
+    // Prepare receipt data text - limit length to prevent input token issues
     const receiptText =
       Array.isArray(items)
         ? items.map((it: any) => `${it?.label ?? "field"}: ${it?.value ?? ""}`).join("\n")
         : "";
+    
+    // Limit receipt text to reasonable length (approximately 2000 characters = ~500 tokens)
+    // This prevents input token limits while still providing enough context
+    const maxReceiptTextLength = 2000;
+    const truncatedReceiptText = receiptText.length > maxReceiptTextLength
+      ? receiptText.substring(0, maxReceiptTextLength) + `\n... (truncated, showing first ${maxReceiptTextLength} characters)`
+      : receiptText;
+    
+    if (receiptText.length > maxReceiptTextLength) {
+      console.warn(`⚠️ Receipt text truncated from ${receiptText.length} to ${maxReceiptTextLength} characters to prevent input token limit`);
+    }
 
     // Determine which model to use - check available models first, then fallback to defaults
     let preferredModel = process.env.GEMINI_MODEL;
@@ -144,7 +155,7 @@ export async function POST(request: NextRequest) {
       { text: `You are an expert fraud detection analyst specializing in expense receipt analysis. Analyze the following receipt data and determine if there are any indicators of fraud or suspicious activity.
 
 Receipt Data:
-${receiptText}
+${truncatedReceiptText}
 
 Additional Context:
 - Vendor: ${receiptData?.merchant ?? "Unknown"}
@@ -167,16 +178,19 @@ Provide your analysis in the following JSON format:
 {
   "fraudulent": boolean,
   "fraudProbability": number (0-1),
-  "explanation": "A concise, readable summary (2-4 sentences maximum) written for employees and managers. Use plain language, avoid technical jargon. If fraud is detected, briefly state the main concern. If clear, simply confirm the receipt appears legitimate. Keep it under 200 words.",
-  "riskFactors": ["list of specific risk factors identified"],
+  "explanation": "A concise, readable summary (2-4 sentences maximum) written for employees and managers. Use plain language, avoid technical jargon. If fraud is detected, briefly state the main concern. If clear, simply confirm the receipt appears legitimate. Keep it under 150 words.",
+  "riskFactors": ["list of specific risk factors identified (maximum 5 items)"],
   "confidence": number (0-1)
 }
 
 IMPORTANT: The explanation must be:
-- Short and concise (2-4 sentences, under 200 words)
+- Short and concise (2-4 sentences, under 150 words)
 - Written in plain language for non-technical readers (employees/managers)
 - Focused on the key finding only
 - Professional and clear
+- Maximum 5 risk factors in the riskFactors array
+
+CRITICAL: Respond with ONLY valid JSON. Do not include any text before or after the JSON object. Ensure the JSON is complete and properly formatted.
 
 Be thorough but fair. Only flag as fraudulent if you identify clear indicators.` },
     ];
@@ -234,7 +248,7 @@ Be thorough but fair. Only flag as fraudulent if you identify clear indicators.`
         temperature: 0.3,
         topK: 40,
         topP: 0.95,
-        maxOutputTokens: 512, // Reduced to encourage concise, readable explanations for employees/managers
+        maxOutputTokens: 2048, // Increased to prevent MAX_TOKENS truncation while still encouraging concise responses
       },
     };
 
@@ -381,15 +395,19 @@ Be thorough but fair. Only flag as fraudulent if you identify clear indicators.`
     const candidate = geminiData?.candidates?.[0];
     const finishReason = candidate?.finishReason;
     
-    // Check if response was truncated
-    if (finishReason === 'MAX_TOKENS' || finishReason === 'OTHER') {
-      console.warn(`⚠️ Gemini response may be incomplete (finishReason: ${finishReason})`);
-    }
-    
     const aiTextResponse = candidate?.content?.parts
       ?.map((part: any) => part?.text || "")
       .join("")
       .trim();
+
+    // Check if response was truncated
+    if (finishReason === 'MAX_TOKENS') {
+      console.warn(`⚠️ Gemini response was truncated due to MAX_TOKENS limit. This shouldn't happen with 2048 tokens - response may be incomplete.`);
+      console.warn(`⚠️ Response length: ${aiTextResponse?.length || 0} characters`);
+      // Note: We'll still try to parse it as the code below handles partial JSON
+    } else if (finishReason === 'OTHER') {
+      console.warn(`⚠️ Gemini response finished with reason: ${finishReason}`);
+    }
 
     if (!aiTextResponse) {
       console.warn("⚠️ Gemini API returned no usable content", geminiData);

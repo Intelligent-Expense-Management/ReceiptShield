@@ -10,13 +10,16 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, AlertTriangle, CheckCircle, Loader2, FileEdit, FileType, Eye } from 'lucide-react';
+import { ArrowLeft, AlertTriangle, CheckCircle, Loader2, FileEdit, FileType, Eye, Brain, Bot, TrendingUp } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 // import { performEnhancedFraudAnalysis } from '@/lib/enhanced-fraud-service'; // Temporarily disabled
 import { extractTextWithTesseract } from '@/lib/tesseract-ocr-service';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/contexts/auth-context'; // Import useAuth
 import { summarizeAIAnalysis } from '@/lib/ai-analysis-summarizer';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import { Separator } from '@/components/ui/separator';
 
 export default function VerifyReceiptPage() {
   const params = useParams();
@@ -271,66 +274,113 @@ export default function VerifyReceiptPage() {
         category: 'Business Expense',
       };
 
-      // Get ML prediction
+      // Check if we already have fraud analysis from upload - reuse it to avoid duplicate Gemini calls
+      const existingFraudAnalysis = receipt.fraud_analysis;
+      const hasExistingAIDetection = existingFraudAnalysis?.ai_detection;
+      const hasExistingMLPrediction = existingFraudAnalysis?.ml_prediction;
+      
+      // Get ML prediction - always recalculate if items changed, otherwise reuse
       let mlPrediction: MLFraudPrediction | null = null;
-      let aiDetection: AIFraudDetection | null = null;
+      
+      // Check if items have changed significantly (simple comparison)
+      const itemsChanged = JSON.stringify(editableItems) !== JSON.stringify(receipt.items);
+      
+      if (hasExistingMLPrediction && !itemsChanged && user?.role === 'employee') {
+        // Reuse existing ML prediction if items haven't changed and user is employee
+        console.log('♻️ Reusing existing ML prediction');
+        mlPrediction = existingFraudAnalysis.ml_prediction ?? null;
+      } else {
+        // Recalculate ML prediction
+        try {
+          console.log('🤖 Calling ML prediction API...');
 
-      try {
-        console.log('🤖 Calling ML prediction API...');
+          const mlResponse = await fetch('/api/ml-predict', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              ...receiptDataForAnalysis,
+              items: editableItems,
+            })
+          });
 
-        const mlResponse = await fetch('/api/ml-predict', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            ...receiptDataForAnalysis,
-            items: editableItems,
-          })
-        });
-
-        if (mlResponse.ok) {
-          const mlData = await mlResponse.json();
-          mlPrediction = mlData.prediction;
-          console.log('✅ ML prediction received:', mlPrediction);
-        } else {
-          console.warn('⚠️ ML prediction failed:', mlResponse.status);
+          if (mlResponse.ok) {
+            const mlData = await mlResponse.json();
+            mlPrediction = mlData.prediction;
+            console.log('✅ ML prediction received:', mlPrediction);
+          } else {
+            console.warn('⚠️ ML prediction failed:', mlResponse.status);
+            // Fallback to existing if available
+            if (hasExistingMLPrediction) {
+              mlPrediction = existingFraudAnalysis.ml_prediction ?? null;
+            }
+          }
+        } catch (mlError) {
+          console.warn('⚠️ ML prediction error:', mlError);
+          // Fallback to existing if available
+          if (hasExistingMLPrediction) {
+            mlPrediction = existingFraudAnalysis.ml_prediction ?? null;
+          }
         }
-      } catch (mlError) {
-        console.warn('⚠️ ML prediction error:', mlError);
       }
 
-      try {
-        console.log('🤖 Calling AI fraud analysis API...');
+      // Get AI detection - reuse from upload if available, only call Gemini if missing
+      let aiDetection: AIFraudDetection | null = null;
+      
+      if (hasExistingAIDetection && !itemsChanged && user?.role === 'employee') {
+        // Reuse existing AI detection if items haven't changed and user is employee
+        console.log('♻️ Reusing existing AI detection from upload (avoiding duplicate Gemini call)');
+        aiDetection = existingFraudAnalysis.ai_detection ?? null;
+      } else if (user?.role === 'manager' && hasExistingAIDetection && !itemsChanged) {
+        // Managers can also reuse if items haven't changed
+        console.log('♻️ Reusing existing AI detection for manager (avoiding duplicate Gemini call)');
+        aiDetection = existingFraudAnalysis.ai_detection ?? null;
+      } else {
+        // Only call Gemini if:
+        // 1. No existing AI detection
+        // 2. Items have changed significantly (may affect fraud analysis)
+        // 3. Manager explicitly re-analyzing after edits
+        try {
+          console.log('🤖 Calling AI fraud analysis API... (items changed or no existing analysis)');
 
-        const aiResponse = await fetch('/api/ai-fraud-analysis', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            items: editableItems,
-            imageUrl: receipt.imageUrl || receipt.imageDataUri,
-            receiptData: receiptDataForAnalysis
-          })
-        });
+          const aiResponse = await fetch('/api/ai-fraud-analysis', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              items: editableItems,
+              imageUrl: receipt.imageUrl || receipt.imageDataUri,
+              receiptData: receiptDataForAnalysis
+            })
+          });
 
-        if (aiResponse.ok) {
-          const aiData = await aiResponse.json();
-          // Process explanation to ensure it's concise and readable
-          const rawExplanation = aiData.explanation ?? 'AI analysis completed. No fraud indicators detected.';
-          const conciseExplanation = summarizeAIAnalysis(rawExplanation);
-          aiDetection = {
-            fraudulent: aiData.fraudulent ?? false,
-            fraudProbability: aiData.fraudProbability ?? 0.1,
-            explanation: conciseExplanation,
-          };
-          console.log('✅ AI analysis received:', aiDetection);
-        } else {
-          console.warn('⚠️ AI analysis failed:', aiResponse.status);
+          if (aiResponse.ok) {
+            const aiData = await aiResponse.json();
+            // Process explanation to ensure it's concise and readable
+            const rawExplanation = aiData.explanation ?? 'AI analysis completed. No fraud indicators detected.';
+            const conciseExplanation = summarizeAIAnalysis(rawExplanation);
+            aiDetection = {
+              fraudulent: aiData.fraudulent ?? false,
+              fraudProbability: aiData.fraudProbability ?? 0.1,
+              explanation: conciseExplanation,
+            };
+            console.log('✅ AI analysis received:', aiDetection);
+          } else {
+            console.warn('⚠️ AI analysis failed:', aiResponse.status);
+            // Fallback to existing if available
+            if (hasExistingAIDetection) {
+              aiDetection = existingFraudAnalysis.ai_detection ?? null;
+            }
+          }
+        } catch (aiError) {
+          console.warn('⚠️ AI analysis error:', aiError);
+          // Fallback to existing if available
+          if (hasExistingAIDetection) {
+            aiDetection = existingFraudAnalysis.ai_detection ?? null;
+          }
         }
-      } catch (aiError) {
-        console.warn('⚠️ AI analysis error:', aiError);
       }
 
       const mlFraudProbability = mlPrediction?.fraud_probability ?? 0.1;
@@ -558,6 +608,109 @@ export default function VerifyReceiptPage() {
                 </p>
             </div>
           </div>
+
+          {/* Review & Analysis Section */}
+          {receipt.fraud_analysis && (
+            <>
+              <Separator className="my-6" />
+              <div className="space-y-4">
+                <h3 className="font-semibold text-lg text-[var(--color-text)]">Review & Analysis</h3>
+                <div className="space-y-3">
+                  {/* Overall Risk Assessment */}
+                  <div className="flex items-center justify-between p-3 bg-muted/50 rounded-md shadow-sm">
+                    <span className="text-sm font-medium flex items-center gap-2">
+                      <TrendingUp className="w-4 h-4" />
+                      Overall Risk Assessment:
+                    </span>
+                    <Badge 
+                      variant={
+                        receipt.fraud_analysis.overall_risk_assessment === 'HIGH' ? 'destructive' :
+                        receipt.fraud_analysis.overall_risk_assessment === 'MEDIUM' ? 'secondary' : 'default'
+                      }
+                      className={
+                        receipt.fraud_analysis.overall_risk_assessment === 'HIGH' ? 'bg-red-500' :
+                        receipt.fraud_analysis.overall_risk_assessment === 'MEDIUM' ? 'bg-yellow-500' : 'bg-green-500'
+                      }
+                    >
+                      {receipt.fraud_analysis.overall_risk_assessment} RISK
+                    </Badge>
+                  </div>
+
+                  {/* ML Model Results */}
+                  {receipt.fraud_analysis.ml_prediction ? (
+                    <div className="p-3 bg-blue-50 dark:bg-blue-950/20 rounded-md border border-blue-200 dark:border-blue-800">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium flex items-center gap-2">
+                          <Brain className="w-4 h-4 text-blue-600" />
+                          ML Model Analysis:
+                        </span>
+                        <Badge variant="outline" className="border-blue-300">
+                          {receipt.fraud_analysis.ml_prediction.risk_level} RISK
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Progress 
+                          value={Math.round(receipt.fraud_analysis.ml_prediction.fraud_probability * 100)} 
+                          className="w-full h-2"
+                          indicatorClassName="bg-blue-500"
+                        />
+                        <span className="font-semibold text-sm text-blue-600 min-w-[45px]">
+                          {Math.round(receipt.fraud_analysis.ml_prediction.fraud_probability * 100)}%
+                        </span>
+                      </div>
+                      <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
+                        Confidence: {Math.round(receipt.fraud_analysis.ml_prediction.confidence * 100)}%
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="p-3 bg-gray-50 dark:bg-gray-950/20 rounded-md border border-gray-200">
+                      <span className="text-sm font-medium flex items-center gap-2 text-gray-600">
+                        <Brain className="w-4 h-4" />
+                        ML Model: Unavailable (server offline)
+                      </span>
+                    </div>
+                  )}
+
+                  {/* AI Analysis Results */}
+                  {receipt.fraud_analysis.ai_detection ? (
+                    <div className="p-3 bg-purple-50 dark:bg-purple-950/20 rounded-md border border-purple-200 dark:border-purple-800">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium flex items-center gap-2">
+                          <Bot className="w-4 h-4 text-purple-600" />
+                          AI Analysis:
+                        </span>
+                        <Badge variant="outline" className="border-purple-300">
+                          {receipt.fraud_analysis.ai_detection.fraudulent ? 'FLAGGED' : 'CLEAR'}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Progress 
+                          value={Math.round(receipt.fraud_analysis.ai_detection.fraudProbability * 100)} 
+                          className="w-full h-2"
+                          indicatorClassName="bg-purple-500"
+                        />
+                        <span className="font-semibold text-sm text-purple-600 min-w-[45px]">
+                          {Math.round(receipt.fraud_analysis.ai_detection.fraudProbability * 100)}%
+                        </span>
+                      </div>
+                      <ScrollArea className="h-24 mt-2">
+                        <p className="text-xs text-purple-700 dark:text-purple-300 whitespace-pre-wrap">
+                          {summarizeAIAnalysis(receipt.fraud_analysis.ai_detection.explanation)}
+                        </p>
+                      </ScrollArea>
+                    </div>
+                  ) : (
+                    <div className="p-3 bg-gray-50 dark:bg-gray-950/20 rounded-md border border-gray-200">
+                      <span className="text-sm font-medium flex items-center gap-2 text-gray-600">
+                        <Bot className="w-4 h-4" />
+                        AI Analysis: Unavailable
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
         </CardContent>
         <CardFooter className="flex justify-end gap-2 pt-4">
           <Button type="button" variant="outline" onClick={() => router.push(user?.role === 'manager' ? '/manager/dashboard' : '/employee/dashboard')} disabled={isProcessing}>
