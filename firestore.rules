@@ -103,13 +103,17 @@ service cloud.firestore {
         true // Temporary: allow all authenticated users (app-level filtering)
       );
       
-      // Allow writes only for owners or platform admins
-      allow write: if isAuthenticated() && 
-        (resource.data.ownerId == request.auth.uid || isPlatformAdmin());
-      
-      // Allow create if user is setting themselves as owner
+      // Allow create if user is setting themselves as owner (for signup)
       allow create: if isAuthenticated() && 
         request.resource.data.ownerId == request.auth.uid;
+      
+      // Allow update only for owners or platform admins
+      allow update: if isAuthenticated() && 
+        (resource.data.ownerId == request.auth.uid || isPlatformAdmin());
+      
+      // Allow delete only for owners or platform admins
+      allow delete: if isAuthenticated() && 
+        (resource.data.ownerId == request.auth.uid || isPlatformAdmin());
     }
     
     // Company settings subcollection
@@ -144,14 +148,17 @@ service cloud.firestore {
     // Subscription usage tracking
     match /subscriptionUsage/{usageId} {
       allow read: if isAuthenticated();
-      allow write: if isAuthenticated() && (
+      // Allow create for authenticated users (during signup, users don't have companyId in claims yet)
+      // App-level validation ensures companyId is set correctly
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && (
         !hasCompanyClaim() ||
         resource.data.companyId == getUserCompanyId() || 
         isPlatformAdmin()
       );
-      allow create: if isAuthenticated() && (
+      allow delete: if isAuthenticated() && (
         !hasCompanyClaim() ||
-        request.resource.data.companyId == getUserCompanyId() || 
+        resource.data.companyId == getUserCompanyId() || 
         isPlatformAdmin()
       );
     }
